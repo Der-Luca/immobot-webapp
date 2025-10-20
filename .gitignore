@@ -5,3 +5,10 @@ firebase-debug.log
 functions/node_modules
 node_modules
 .DS_Store
+.env
+.env.*
+*.env
+node_modules
+.DS_Store
+firebase-debug.log
+functions/node_modules
