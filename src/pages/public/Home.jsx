@@ -1,3 +1,10 @@
+
+
+import Step1 from "./register/Step1"
+
 export default function Home() {
-  return <h1 className="text-3xl font-bold">🏠 Public: Home</h1>;
+  return <div>
+     
+  <Step1/>
+  </div>
 }
