@@ -87,9 +87,8 @@ export default function Step1() {
 
   return (
     <div className="space-y-8 rounded-2xl border p-6">
-      <p className="text-center text-sm text-gray-500">Schritt 1 von 3</p>
-      <h2 className="text-xl font-semibold text-center">Was sollen wir für dich finden?</h2>
-
+      <p className="text-center text-sm text-gray-500">Schritt 1 von 5</p>
+      <p className="mx-auto text-center text-2xl text-gray-500 font-bold"> Angebotsart</p>
       {/* Angebotsart – OR-Logik */}
       <div className="mx-auto max-w-md">
         <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -122,6 +121,7 @@ export default function Step1() {
 
       {/* Objektklassen (max 2) */}
       <div className="space-y-2">
+        <p className="mx-auto text-center text-2xl text-gray-500 font-bold"> Objektart</p>
         <p className="text-center text-sm text-gray-600">Wähle bis zu zwei Stück aus:</p>
         <div className="flex flex-wrap gap-2 justify-center">
           {CLASS_OPTIONS.map((opt) => {

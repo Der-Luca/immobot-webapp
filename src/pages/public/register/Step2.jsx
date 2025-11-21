@@ -156,7 +156,7 @@ export default function Step2() {
 
   return (
     <div className="space-y-6 rounded-2xl border p-6">
-      <p className="text-center text-sm text-gray-500">Schritt 2 von 3</p>
+      <p className="text-center text-sm text-gray-500">Schritt 2 von 5</p>
       <h2 className="text-xl font-semibold text-center">
         Wo sollen wir etwas für dich finden?
       </h2>
@@ -164,7 +164,7 @@ export default function Step2() {
       {/* Adresse */}
      {/* Adresse */}
 <div className="mx-auto max-w-md relative">
-  <label className="block text-sm font-medium mb-1">Ort/Stadt eingeben:</label>
+  <label className="block text-sm font-medium mb-1 text-center">Ort/Stadt eingeben:</label>
   <input
     value={query}
     onChange={(e) => setQuery(e.target.value)}
@@ -195,7 +195,7 @@ export default function Step2() {
 
       {/* Radius */}
       <div className="mx-auto max-w-md">
-        <label className="block text-sm font-medium mb-2">Radius (in km):</label>
+        <label className="block text-sm font-medium mb-2 text-center">Radius (in km):</label>
         <div className="flex flex-wrap gap-2 items-center">
           {RADIUS_PRESETS.map((km) => (
             <button

@@ -44,7 +44,11 @@ export default function Step5Optional() {
 
   function toggleChip(key, value, setLocal) {
     toggleInArray(key, value);
-    setLocal(prev => (prev?.includes(value) ? prev.filter(v => v !== value) : [...(prev||[]), value]));
+    setLocal(prev =>
+      prev?.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...(prev || []), value]
+    );
   }
 
   function saveRanges() {
@@ -56,7 +60,9 @@ export default function Step5Optional() {
 
   return (
     <div className="space-y-6 rounded-2xl border p-6">
-      <p className="text-center text-sm text-gray-500">Schritt 5 von 5 (optional)</p>
+      <p className="text-center text-sm text-gray-500">
+        Schritt 5 von 5 (optional)
+      </p>
 
       {/* ——— Startzustand: NUR Frage + zwei CTAs ——— */}
       {!showAdvanced && (
@@ -75,7 +81,7 @@ export default function Step5Optional() {
             <button
               type="button"
               className="px-5 py-3 rounded-xl bg-blue-900 text-white"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/register/finish")}
             >
               Nein… Jetzt registrieren
             </button>
@@ -83,7 +89,6 @@ export default function Step5Optional() {
         </div>
       )}
 
-      {/* ——— Nach Klick: Extra-Filter + „Login >“ ——— */}
       {showAdvanced && (
         <>
           <h2 className="text-xl font-semibold text-center">Weitere Filter</h2>
@@ -92,43 +97,80 @@ export default function Step5Optional() {
           </p>
 
           <Section title="Energieträger (energySources)">
-            <ChipGrid options={ENERGY_SOURCES} active={energySources}
-              onToggle={(v)=>toggleChip("energySources", v, setES)} />
+            <ChipGrid
+              options={ENERGY_SOURCES}
+              active={energySources}
+              onToggle={(v) => toggleChip("energySources", v, setES)}
+            />
           </Section>
 
           <Section title="Heizungsart (heatingTypes)">
-            <ChipGrid options={HEATING_TYPES} active={heatingTypes}
-              onToggle={(v)=>toggleChip("heatingTypes", v, setHT)} />
+            <ChipGrid
+              options={HEATING_TYPES}
+              active={heatingTypes}
+              onToggle={(v) => toggleChip("heatingTypes", v, setHT)}
+            />
           </Section>
 
           <Section title="Energieklasse (energyRatings)">
-            <ChipGrid options={ENERGY_RATINGS} active={energyRatings}
-              onToggle={(v)=>toggleChip("energyRatings", v, setER)} />
+            <ChipGrid
+              options={ENERGY_RATINGS}
+              active={energyRatings}
+              onToggle={(v) => toggleChip("energyRatings", v, setER)}
+            />
           </Section>
 
           <Section title="Energiestandard (energyEfficiencyStandards)">
-            <ChipGrid options={EFFICIENCY_STANDARDS} active={effStandards}
-              onToggle={(v)=>toggleChip("energyEfficiencyStandards", v, setEff)} />
+            <ChipGrid
+              options={EFFICIENCY_STANDARDS}
+              active={effStandards}
+              onToggle={(v) => toggleChip("energyEfficiencyStandards", v, setEff)}
+            />
           </Section>
 
           <Section title="Preis pro m² (pricePerSqmRange)">
-            <RangeRow unit="€/m²" from={pqmFrom} to={pqmTo}
-              setFrom={setPqmFrom} setTo={setPqmTo} onBlurSave={saveRanges} />
+            <RangeRow
+              unit="€/m²"
+              from={pqmFrom}
+              to={pqmTo}
+              setFrom={setPqmFrom}
+              setTo={setPqmTo}
+              onBlurSave={saveRanges}
+            />
           </Section>
 
           <Section title="Rendite (yieldRange)">
-            <RangeRow unit="%" step="0.1" from={yieldF} to={yieldT}
-              setFrom={setYieldF} setTo={setYieldT} onBlurSave={saveRanges} />
+            <RangeRow
+              unit="%"
+              step="0.1"
+              from={yieldF}
+              to={yieldT}
+              setFrom={setYieldF}
+              setTo={setYieldT}
+              onBlurSave={saveRanges}
+            />
           </Section>
 
           <Section title="Energieverbrauch (energyConsumptionRange)">
-            <RangeRow unit="kWh/m²*a" from={ecFrom} to={ecTo}
-              setFrom={setEcFrom} setTo={setEcTo} onBlurSave={saveRanges} />
+            <RangeRow
+              unit="kWh/m²*a"
+              from={ecFrom}
+              to={ecTo}
+              setFrom={setEcFrom}
+              setTo={setEcTo}
+              onBlurSave={saveRanges}
+            />
           </Section>
 
           <Section title="Baujahr (constructionYearRange)">
-            <RangeRow unit="" from={byFrom} to={byTo}
-              setFrom={setByFrom} setTo={setByTo} onBlurSave={saveRanges} />
+            <RangeRow
+              unit=""
+              from={byFrom}
+              to={byTo}
+              setFrom={setByFrom}
+              setTo={setByTo}
+              onBlurSave={saveRanges}
+            />
           </Section>
 
           <div className="flex items-center justify-between">
@@ -139,13 +181,7 @@ export default function Step5Optional() {
             >
               Auswahl ausblenden
             </button>
-            <button
-              type="button"
-              className="px-5 py-3 rounded-xl bg-blue-900 text-white"
-              onClick={() => { saveRanges(); navigate("/login"); }}
-            >
-              Login &gt;
-            </button>
+         
           </div>
         </>
       )}
@@ -164,9 +200,12 @@ export default function Step5Optional() {
           <button
             type="button"
             className="px-6 py-3 rounded-xl bg-blue-900 text-white"
-            onClick={() => { saveRanges(); navigate("/login"); }}
+            onClick={() => {
+              saveRanges();
+              navigate("/register/finish");
+            }}
           >
-            Login &gt;
+            Jetzt registrieren &gt;
           </button>
         ) : (
           <div />
@@ -180,7 +219,7 @@ export default function Step5Optional() {
 function Section({ title, children }) {
   return (
     <div className="mt-4">
-      <h3 className="mb-2 font-semibold text-sm">{title}</h3>
+      <h3 className="mb-2 font-semibold text-sm text-center">{title}</h3>
       {children}
     </div>
   );
@@ -188,7 +227,7 @@ function Section({ title, children }) {
 
 function ChipGrid({ options, active = [], onToggle }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div className="flex flex-wrap justify-center max-w-3xl mx-auto">
       {options.map((opt) => {
         const isActive = active?.includes(opt);
         return (
@@ -196,8 +235,8 @@ function ChipGrid({ options, active = [], onToggle }) {
             key={opt}
             type="button"
             onClick={() => onToggle(opt)}
-            className={`px-3 py-2 rounded-full border text-sm text-left ${
-              isActive ? "bg-blue-600 text-white" : "bg-white"
+            className={`m-1 inline-flex items-center justify-center rounded-full border px-3 py-1.5 text-xs sm:text-sm ${
+              isActive ? "bg-blue-600 text-white" : "bg-white text-gray-800"
             }`}
             title={opt}
           >
@@ -209,29 +248,40 @@ function ChipGrid({ options, active = [], onToggle }) {
   );
 }
 
-function RangeRow({ unit, from, to, setFrom, setTo, step="1", onBlurSave }) {
+function RangeRow({ unit, from, to, setFrom, setTo, step = "1", onBlurSave }) {
   return (
-    <div className="flex items-center gap-2">
-      <input
-        type="number"
-        step={step}
-        value={from}
-        onChange={(e)=>setFrom(e.target.value)}
-        onBlur={onBlurSave}
-        className="w-28 rounded-lg border px-3 py-2"
-        placeholder="von"
-      />
-      <span>bis</span>
-      <input
-        type="number"
-        step={step}
-        value={to}
-        onChange={(e)=>setTo(e.target.value)}
-        onBlur={onBlurSave}
-        className="w-28 rounded-lg border px-3 py-2"
-        placeholder="bis"
-      />
-      {unit && <span className="text-sm text-gray-500">{unit}</span>}
+    <div className="flex flex-col items-center gap-2">
+      {/* von */}
+      <div className="flex flex-col items-center w-full max-w-xs">
+        <label className="text-xs text-gray-500 mb-1">von</label>
+        <input
+          type="number"
+          step={step}
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          onBlur={onBlurSave}
+          className="w-full rounded-lg border px-3 py-2 text-center"
+        />
+      </div>
+
+      {/* bis */}
+      <div className="flex flex-col items-center w-full max-w-xs">
+        <label className="text-xs text-gray-500 mb-1">bis</label>
+        <input
+          type="number"
+          step={step}
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          onBlur={onBlurSave}
+          className="w-full rounded-lg border px-3 py-2 text-center"
+        />
+      </div>
+
+      {/* Einheit */}
+      {unit && (
+        <span className="text-sm text-gray-500 mt-1">{unit}</span>
+      )}
     </div>
   );
 }
+

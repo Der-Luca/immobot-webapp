@@ -35,7 +35,7 @@ function Step3() {
 
   return (
     <div className="space-y-8 rounded-2xl border p-6 max-w-xl mx-auto">
-      <p className="text-center text-sm text-gray-500">Schritt 3 von 3</p>
+      <p className="text-center text-sm text-gray-500">Schritt 3 von 5</p>
       <h2 className="text-xl font-semibold text-center">{title}</h2>
 
       <div className="flex flex-wrap gap-2 justify-center">

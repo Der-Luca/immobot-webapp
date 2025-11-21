@@ -1,3 +1,26 @@
+import { useAuth } from "../../../contexts/AuthContext";
+import useUserFilters from "./hooks/useUserFilters";
+import LocationCard from "./filters/LocationCard";
+import ObjectCard from "./filters/ObjectCard";
+import PriceCard from "./filters/PriceCard";
+import ExtrasCard from "./filters/ExtrasCard";
+
 export default function Dashboard() {
-  return <h1 className="text-3xl font-bold">👤 User: Dashboard</h1>;
+  const { user } = useAuth();
+  const { filters, loading } = useUserFilters();
+
+  if (loading) return <p style={{ padding: 20 }}>Lade Filter…</p>;
+
+  return (
+    <div style={{ padding: 30 }}>
+      <h1 style={{ fontSize: 40, marginBottom: 20 }}>Dein Dashboard</h1>
+
+      <div style={{ display: "grid", gap: 20 }}>
+        <LocationCard filters={filters} user={user} />
+        <ObjectCard filters={filters} user={user} />
+        <PriceCard filters={filters} user={user} />
+        <ExtrasCard filters={filters} user={user} />
+      </div>
+    </div>
+  );
 }

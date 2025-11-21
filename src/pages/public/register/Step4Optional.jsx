@@ -64,7 +64,7 @@ export default function Step4() {
             <button
               type="button"
               className="px-5 py-3 rounded-xl bg-blue-900 text-white"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/register/finish")}
             >
               Nein... Jetzt registrieren
             </button>
@@ -76,7 +76,7 @@ export default function Step4() {
       {showAmenities && (
         <>
               <h2 className="text-xl font-semibold text-center">Ausstattung</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="flex-8 mx-auto w-1/3 ">
             {AMENITIES.map((a) => {
               const active = !!amen[a.key];
               return (
@@ -84,7 +84,7 @@ export default function Step4() {
                   key={a.key}
                   type="button"
                   onClick={() => onToggleAmenity(a.key)}
-                  className={`px-3 py-2 rounded-full border text-sm text-left ${
+                  className={` m-1 px-3 py-2 rounded-full  border text-sm text-left ${
                     active ? "bg-blue-600 text-white" : "bg-white"
                   }`}
                   title={a.key}
