@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../../../firebase";
-import { useAuth } from "../../../../contexts/AuthContext";
+import { db } from "../../../firebase";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const MAPTILER_KEY = "VUVj9lGbHQAdYVsF04k8";
 

@@ -2,9 +2,9 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "../../../firebase"; // Pfad ggf. anpassen
+import { auth, db } from "../../../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { saveCurrentFiltersForUser } from "./storage/saveFilters"; // Pfad ggf. anpassen
+import { saveCurrentFiltersForUser } from "./storage/saveFilters";
 
 export default function RegisterFinish() {
   const nav = useNavigate();
@@ -14,8 +14,8 @@ export default function RegisterFinish() {
   const [email,     setEmail] = useState("");
   const [pw,        setPw]    = useState("");
 
-  const [acceptTerms, setAcceptTerms]       = useState(false); // Pflicht
-  const [marketingOptIn, setMarketingOptIn] = useState(false); // optional
+  const [acceptTerms, setAcceptTerms]       = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState("");
@@ -31,27 +31,31 @@ export default function RegisterFinish() {
   async function onRegister(e) {
     e.preventDefault();
     if (!canSubmit) return;
-    setBusy(true); setErr("");
+
+    setBusy(true);
+    setErr("");
 
     try {
-      // 1) User in Firebase Auth anlegen
-      const { user } = await createUserWithEmailAndPassword(auth, email, pw);
+      // 1) Auth
+      const { user } = await createUserWithEmailAndPassword(auth, email.trim(), pw);
 
-      // 2) User-Profil in Firestore (merge, falls vorhanden)
-      const userRef = doc(db, "users", user.uid);
-      await setDoc(userRef, {
+      // 2) Firestore-Profil
+      await setDoc(doc(db, "users", user.uid), {
         firstName: firstName.trim(),
         lastName:  lastName.trim(),
         email:     email.trim().toLowerCase(),
+        role:      "user",                    // <<< automatisch user
+        stripeStatus: "none",                 // <<< Stripe nicht bezahlt
+        stripeCustomerId: null,               // <<< wird später gefüllt
         marketingOptIn,
         acceptedTermsAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestamp()
       }, { merge: true });
 
-      // 3) Aktuelle Filter-JSON sichern (aus deinem Storage aggregiert)
+      // 3) Filter sichern
       await saveCurrentFiltersForUser(user.uid);
 
-      // 4) Weiterleitung
+      // 4) Weiter zum Dashboard
       nav("/dashboard");
     } catch (e) {
       setErr(e.message || "Fehler bei der Registrierung");

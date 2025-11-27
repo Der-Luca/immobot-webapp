@@ -1,14 +1,22 @@
-import { Outlet, Link } from "react-router-dom";
+// src/layouts/PublicLayout.jsx
+import { Outlet, useLocation } from "react-router-dom";
+import MainNav from "./MainNav";
 
 export default function PublicLayout() {
+  const location = useLocation();
+
+  // Pfade, auf denen KEINE Navbar angezeigt werden soll
+  const hideNavOn = ["/login"];
+
+  const showNav = !hideNavOn.includes(location.pathname);
+
   return (
-    <div className="min-h-screen">
-      <nav className="p-4 bg-gray-800 text-white flex gap-4">
-        <Link to="/">Home</Link>
-        <Link to="/dashboard" className="ml-auto">Dashboard</Link>
-        <Link to="/admin">Admin</Link>
-      </nav>
-      <main className="p-6"><Outlet /></main>
+    <div className="min-h-screen ">
+      {showNav && <MainNav />}
+
+      <main className="min-h-[calc(100vh-64px)]">
+        <Outlet />
+      </main>
     </div>
   );
 }

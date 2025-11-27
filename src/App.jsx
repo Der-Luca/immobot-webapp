@@ -3,7 +3,6 @@ import PublicLayout from "./layouts/PublicLayout";
 import UserLayout from "./layouts/UserLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
-import Home from "./pages/public/Home";
 import Login from "./pages/public/Login";
 
 // Register-Flow (öffentlich)
@@ -12,21 +11,26 @@ import Step2 from "./pages/public/register/Step2";
 import Step3 from "./pages/public/register/Step3";
 import Step4Optional from "./pages/public/register/Step4Optional";
 import Step5Optional from "./pages/public/register/Step5Optional";
+import RegisterFinish from "./pages/public/register/RegisterFinish";
 
 // Geschützte Bereiche
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AdminRoute from "./routes/AdminRoute";
-import Dashboard from "./pages/public/user/Dashboard";
 
+import Dashboard from "./pages/user/Dashboard";
 import AdminDashboard from "./pages/admin/AdminDashbaord";
-import RegisterFinish from "./pages/public/register/RegisterFinish";
+
+import RootRedirect from "./RootRedirect";
 
 export default function App() {
   return (
     <Routes>
       {/* PUBLIC */}
       <Route element={<PublicLayout />}>
-        <Route index element={<Home />} />
+        {/* Root: hängt von Login-Status ab */}
+        <Route index element={<RootRedirect />} />
+
+        {/* Login explizit erreichbar */}
         <Route path="/login" element={<Login />} />
 
         {/* Register-Flow */}
@@ -35,9 +39,9 @@ export default function App() {
           <Route path="step1" element={<Step1 />} />
           <Route path="step2" element={<Step2 />} />
           <Route path="step3" element={<Step3 />} />
-          <Route path="/register/step4" element={<Step4Optional />} />
-          <Route path="/register/step5" element={<Step5Optional />} />
-          <Route path="/register/finish" element={<RegisterFinish />} />
+          <Route path="step4" element={<Step4Optional />} />
+          <Route path="step5" element={<Step5Optional />} />
+          <Route path="finish" element={<RegisterFinish />} />
         </Route>
       </Route>
 

@@ -1,7 +1,7 @@
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../../../firebase";
+import { db } from "../../../firebase";
 import { useState, useEffect } from "react";
-import { useAuth } from "../../../../contexts/AuthContext"
+import { useAuth } from "../../../contexts/AuthContext"
 
 export default function useUserFilters() {
   const { user } = useAuth();
