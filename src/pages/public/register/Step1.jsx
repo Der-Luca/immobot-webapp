@@ -86,7 +86,7 @@ export default function Step1() {
   };
 
   return (
-    <div className="space-y-8 rounded-2xl border p-6">
+    <div className="space-y-8 rounded-2xl border p-6 w-2/3 mx-auto mt-10">
       <p className="text-center text-sm text-gray-500">Schritt 1 von 5</p>
       <p className="mx-auto text-center text-2xl text-gray-500 font-bold"> Angebotsart</p>
       {/* Angebotsart – OR-Logik */}

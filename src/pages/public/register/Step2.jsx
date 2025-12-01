@@ -155,7 +155,7 @@ export default function Step2() {
   }
 
   return (
-    <div className="space-y-6 rounded-2xl border p-6">
+    <div className="space-y-6 rounded-2xl border p-6 w-2/3 mx-auto mt-10">
       <p className="text-center text-sm text-gray-500">Schritt 2 von 5</p>
       <h2 className="text-xl font-semibold text-center">
         Wo sollen wir etwas für dich finden?
