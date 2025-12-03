@@ -1,31 +1,55 @@
-import usePaymentStatus from "./usePaymentStatus";
-import PaymentOverlay from "./PaymentOverlay";
+import { useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase";
+import usePaymentStatus from "./usePaymentStatus";
+import PaymentOverlay from "./PaymentOverlay";
 
+// deine Price-IDs
+const PRICE_MONTHLY = "price_1RSfBkDhGVwiGXJYKqj0kmXx";
+const PRICE_YEARLY  = "price_1RSfECDhGVwiGXJY7a2oCzD9";
 
-export default function RequirePayment({ content }) {
-  const { status } = usePaymentStatus();
+export default function RequirePayment({ children }) {
+  const { isPaid, loading } = usePaymentStatus();
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [error, setError] = useState("");
 
-  if (status === "loading") {
+  async function startCheckout(priceId) {
+    setError("");
+    setCheckingOut(true);
+    try {
+      const createCheckoutSession = httpsCallable(
+        functions,
+        "createCheckoutSession"
+      );
+      const result = await createCheckoutSession({ priceId });
+      const url = result.data?.url;
+      if (!url) throw new Error("Keine Checkout-URL erhalten");
+      window.location.href = url;
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Fehler beim Starten des Checkouts");
+      setCheckingOut(false);
+    }
+  }
+
+  if (loading) {
     return (
-      <div className="p-10 text-center text-slate-500">
-        Lade Zugang…
+      <div className="p-6 text-center text-sm text-gray-500">
+        Prüfe deinen Zugang…
       </div>
     );
   }
 
-  async function startCheckout() {
-    const createSession = httpsCallable(functions, "createCheckoutSession");
-    const res = await createSession({});
-    window.location.href = res.data.url;
+  if (!isPaid) {
+    return (
+      <PaymentOverlay
+        loading={checkingOut}
+        error={error}
+        onSelectMonthly={() => startCheckout(PRICE_MONTHLY)}
+        onSelectYearly={() => startCheckout(PRICE_YEARLY)}
+      />
+    );
   }
 
-  // ❌ nicht bezahlt → gar NICHT Dashboard rendern
-  if (status !== "paid") {
-    return <PaymentOverlay onCheckout={startCheckout} />;
-  }
-
-  // ✔ bezahlt → Dashboard-Inhalt rendern
-  return content;
+  return children;
 }

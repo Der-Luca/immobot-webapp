@@ -1,9 +1,31 @@
+// src/pages/public/register/storage/step3.js
 import { getState, setState } from "./index.js";
 
-// Preis: { from: 0, to }
+// ---------------------------------------
+// HELFER: Bereich speichern {from, to}
+// ---------------------------------------
+export function setSpacePreset(preset) {
+  if (preset === null) {
+    // beliebig
+    return setState({ propertySpaceRange: undefined });
+  }
+
+  if (preset.type === "max") {
+    // bis X
+    return setState({ propertySpaceRange: { from: 0, to: preset.value } });
+  }
+
+  if (preset.type === "min") {
+    // ab X
+    return setState({ propertySpaceRange: { from: preset.value, to: 9999999 } });
+  }
+}
+
+// ---------------------------------------
+// PREISE (wie du es vorher hattest)
+// ---------------------------------------
 export function setPriceUpper(toValue) {
   if (toValue == null) {
-    // „beliebig“ → keine Einschränkung
     return setState({ priceRange: undefined });
   }
   const to = Number(toValue);
@@ -11,32 +33,41 @@ export function setPriceUpper(toValue) {
   return setState({ priceRange: { from: 0, to } });
 }
 
-// Fläche: { from: 0, to }
-export function setSpaceUpper(toValue) {
-  if (toValue == null) {
-    return setState({ propertySpaceRange: undefined });
-  }
-  const to = Number(toValue);
-  if (!Number.isFinite(to) || to <= 0) return getState();
-  return setState({ propertySpaceRange: { from: 0, to } });
-}
-
-// „Auf Anfrage“-Angebote einbeziehen (intern)
-export function setIncludePriceOnRequest(enabled) {
-  return setState({ includePriceOnRequest: !!enabled });
-}
-
-// Helfer für Presets abhängig von Angebotstyp
 export function getPricePresets() {
   const s = getState();
-  const isMieteOnly = s.offerTypes.includes("Miete") && !s.offerTypes.includes("Kauf");
-  if (isMieteOnly) {
-    return [300, 500, 700, 900, 1200, 1500, 1800, null]; // null = „beliebig“
+  const isRentOnly =
+    s.offerTypes.includes("Miete") &&
+    !s.offerTypes.includes("Kauf");
+
+  // Miete
+  if (isRentOnly) {
+    return [300, 500, 700, 900, 1200, 1500, 1800, null];
   }
-  // Default: Kauf
-  return [100000, 200000, 300000, 400000, 500000, 750000, 1000000, 1500000, 2000000, null];
+
+  // Kauf & Grundstück
+  return [150000, 250000, 400000, 600000, 800000, 1000000, 1500000, null];
 }
 
+// ---------------------------------------
+// FLÄCHE PRESETS (NEU!)
+// ---------------------------------------
 export function getSpacePresets() {
-  return [25, 50, 75, 100, 125, 150, 200, null]; // null = „beliebig“
+  const s = getState();
+  const isGrundstueck = s.objectClasses?.includes("Grundstueck");
+
+  // Grundstück gewinnt → Haus/Wohnung ignorieren
+  if (isGrundstueck) {
+    return [
+      { type: "max", value: 500 },     // bis 500
+      { type: "min", value: 500 },     // ab 500
+      null                             // beliebig
+    ];
+  }
+
+  // Haus/Wohnung
+  return [
+    { type: "max", value: 100 },       // bis 100
+    { type: "min", value: 100 },       // ab 100
+    null                               // beliebig
+  ];
 }

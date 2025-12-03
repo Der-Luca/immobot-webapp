@@ -44,7 +44,7 @@ export default function Step5Optional() {
 
   function toggleChip(key, value, setLocal) {
     toggleInArray(key, value);
-    setLocal(prev =>
+    setLocal((prev) =>
       prev?.includes(value)
         ? prev.filter((v) => v !== value)
         : [...(prev || []), value]
@@ -59,7 +59,7 @@ export default function Step5Optional() {
   }
 
   return (
-    <div className="space-y-6 rounded-2xl border p-6">
+    <div className="space-y-6 rounded-2xl border p-6 w-2/3 mx-auto mt-10">
       <p className="text-center text-sm text-gray-500">
         Schritt 5 von 5 (optional)
       </p>
@@ -68,22 +68,22 @@ export default function Step5Optional() {
       {!showAdvanced && (
         <div>
           <p className="text-sm text-gray-700 mb-3 text-center">
-            Benötigst du noch mehr Filter?
+            Möchtest du noch weitere technische Filter nutzen?
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <button
               type="button"
-              className="px-5 py-3 rounded-xl bg-white border hover:bg-gray-100"
+              className="px-5 py-3 rounded-xl bg-white border border-gray-300 text-sm text-gray-800 hover:bg-gray-100 transition"
               onClick={() => setShowAdvanced(true)}
             >
-              Ja, mehr Filter bitte…
+              Ja, unbedingt
             </button>
             <button
               type="button"
-              className="px-5 py-3 rounded-xl bg-blue-900 text-white"
+              className="px-5 py-3 rounded-xl bg-blue-900 text-white text-sm"
               onClick={() => navigate("/register/finish")}
             >
-              Nein… Jetzt registrieren
+              Nein, jetzt registrieren
             </button>
           </div>
         </div>
@@ -91,12 +91,22 @@ export default function Step5Optional() {
 
       {showAdvanced && (
         <>
-          <h2 className="text-xl font-semibold text-center">Weitere Filter</h2>
-          <p className="text-sm text-gray-600 text-center">
-            Achtung: Jeder weitere Filter kann die Trefferquote reduzieren.
+          <h2 className="text-xl font-semibold text-center">Weitere technische Filter</h2>
+
+          <p className="text-xs sm:text-sm text-gray-600 text-center max-w-xl mx-auto">
+            Achtung: Jeder weitere Filter kann die Trefferquote reduzieren.{" "}
+            <a
+              href="https://immobot.pro/funktionen/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Siehe FAQ
+            </a>
+            .
           </p>
 
-          <Section title="Energieträger (energySources)">
+          <Section title="Energieträger">
             <ChipGrid
               options={ENERGY_SOURCES}
               active={energySources}
@@ -104,7 +114,7 @@ export default function Step5Optional() {
             />
           </Section>
 
-          <Section title="Heizungsart (heatingTypes)">
+          <Section title="Heizungsart">
             <ChipGrid
               options={HEATING_TYPES}
               active={heatingTypes}
@@ -112,7 +122,7 @@ export default function Step5Optional() {
             />
           </Section>
 
-          <Section title="Energieklasse (energyRatings)">
+          <Section title="Energieklasse">
             <ChipGrid
               options={ENERGY_RATINGS}
               active={energyRatings}
@@ -120,15 +130,17 @@ export default function Step5Optional() {
             />
           </Section>
 
-          <Section title="Energiestandard (energyEfficiencyStandards)">
+          <Section title="Energiestandard">
             <ChipGrid
               options={EFFICIENCY_STANDARDS}
               active={effStandards}
-              onToggle={(v) => toggleChip("energyEfficiencyStandards", v, setEff)}
+              onToggle={(v) =>
+                toggleChip("energyEfficiencyStandards", v, setEff)
+              }
             />
           </Section>
 
-          <Section title="Preis pro m² (pricePerSqmRange)">
+          <Section title="Preis pro m²">
             <RangeRow
               unit="€/m²"
               from={pqmFrom}
@@ -139,7 +151,7 @@ export default function Step5Optional() {
             />
           </Section>
 
-          <Section title="Rendite (yieldRange)">
+          <Section title="Rendite">
             <RangeRow
               unit="%"
               step="0.1"
@@ -151,7 +163,7 @@ export default function Step5Optional() {
             />
           </Section>
 
-          <Section title="Energieverbrauch (energyConsumptionRange)">
+          <Section title="Energieverbrauch">
             <RangeRow
               unit="kWh/m²*a"
               from={ecFrom}
@@ -162,7 +174,7 @@ export default function Step5Optional() {
             />
           </Section>
 
-          <Section title="Baujahr (constructionYearRange)">
+          <Section title="Baujahr">
             <RangeRow
               unit=""
               from={byFrom}
@@ -172,22 +184,11 @@ export default function Step5Optional() {
               onBlurSave={saveRanges}
             />
           </Section>
-
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              className="text-sm underline"
-              onClick={() => setShowAdvanced(false)}
-            >
-              Auswahl ausblenden
-            </button>
-         
-          </div>
         </>
       )}
 
-      {/* Navigation unten */}
-      <div className="flex items-center justify-between">
+      {/* Navigation unten – immer gleiche Reihe wie Step 4 */}
+      <div className="flex items-center justify-between mt-6">
         <button
           type="button"
           className="px-6 py-3 rounded-xl bg-gray-200"
@@ -195,7 +196,7 @@ export default function Step5Optional() {
         >
           &lt; zurück
         </button>
-        {/* Platzhalter, damit Layout stabil bleibt, wenn nichts offen ist */}
+
         {showAdvanced ? (
           <button
             type="button"
@@ -208,7 +209,7 @@ export default function Step5Optional() {
             Jetzt registrieren &gt;
           </button>
         ) : (
-          <div />
+          <div /> // Platzhalter, damit die Reihe stabil bleibt
         )}
       </div>
     </div>
@@ -235,9 +236,12 @@ function ChipGrid({ options, active = [], onToggle }) {
             key={opt}
             type="button"
             onClick={() => onToggle(opt)}
-            className={`m-1 inline-flex items-center justify-center rounded-full border px-3 py-1.5 text-xs sm:text-sm ${
-              isActive ? "bg-blue-600 text-white" : "bg-white text-gray-800"
-            }`}
+            className={`m-1 inline-flex items-center justify-center rounded-full border px-3 py-1.5 text-xs sm:text-sm transition
+              ${
+                isActive
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+              }`}
             title={opt}
           >
             {opt}
@@ -278,10 +282,7 @@ function RangeRow({ unit, from, to, setFrom, setTo, step = "1", onBlurSave }) {
       </div>
 
       {/* Einheit */}
-      {unit && (
-        <span className="text-sm text-gray-500 mt-1">{unit}</span>
-      )}
+      {unit && <span className="text-sm text-gray-500 mt-1">{unit}</span>}
     </div>
   );
 }
-

@@ -11,8 +11,7 @@ exports.createCheckoutSession = functions.https.onCall(async (data, context) => 
 
   const uid = context.auth.uid;
 
-  // später: Stripe Session erstellen
-  // jetzt: Fake-Bezahl-URL zurückgeben
+  // später echte Stripe Session
   const fakeUrl = "https://immobot.pro/stripe-test?uid=" + uid;
 
   return { url: fakeUrl };
@@ -28,5 +27,5 @@ exports.fakeStripeWebhook = functions.https.onRequest(async (req, res) => {
     stripeLastPayment: new Date().toISOString()
   }, { merge: true });
 
-  return res.send("OK - User now paid");
+  res.send("OK - User now paid");
 });

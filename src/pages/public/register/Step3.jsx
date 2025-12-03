@@ -1,72 +1,144 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getState } from "./storage/index.js";
-import { getPricePresets, getSpacePresets, setPriceUpper, setSpaceUpper } from "./storage/step3.js";
+import {
+  getPricePresets,
+  getSpacePresets,
+  setPriceUpper,
+  setSpacePreset,
+} from "./storage/step3.js";
 
 function Chip({ active, onClick, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-2 rounded-full border text-sm ${active ? "bg-blue-600 text-white" : "bg-white"}`}
+      className={`px-4 py-2 rounded-full border text-sm transition ${
+        active
+          ? "bg-blue-600 text-white border-blue-600"
+          : "bg-white text-gray-800"
+      }`}
     >
       {children}
     </button>
   );
 }
 
-function Step3() {
+export default function Step3() {
   const navigate = useNavigate();
   const initial = useMemo(() => getState(), []);
-  const pricePresets = useMemo(() => getPricePresets(), []);
-  const spacePresets = useMemo(() => getSpacePresets(), []);
+
+  const pricePresets = getPricePresets();
+  const spacePresets = getSpacePresets();
+
   const [priceTo, setPriceTo] = useState(initial.priceRange?.to ?? null);
-  const [spaceTo, setSpaceTo] = useState(initial.propertySpaceRange?.to ?? null);
+  const [spaceValue, setSpaceValue] = useState(
+    initial.propertySpaceRange?.to ?? null
+  );
 
-  const selectPrice = (to) => { setPriceTo(to); setPriceUpper(to); };
-  const selectSpace = (to) => { setSpaceTo(to); setSpaceUpper(to); };
+  const isGrundstueck = initial.objectClasses?.includes("Grundstueck");
+  const isMieteOnly =
+    initial.offerTypes?.includes("Miete") &&
+    !initial.offerTypes?.includes("Kauf");
 
-  const fmtEUR = (n) => (typeof n === "number" ? `bis ${n.toLocaleString("de-DE")} €` : "beliebig");
-  const fmtQM  = (n) => (typeof n === "number" ? `bis ${n} qm` : "beliebig");
+  const fmtEUR = (val, idx) => {
+    if (val == null) return "beliebig";
+    const formatted = val.toLocaleString("de-DE");
 
-  const isRentOnly = initial.offerTypes?.includes("Miete") && !initial.offerTypes?.includes("Kauf");
-  const title = isRentOnly ? "Was ist dein persönlicher Höchstpreis (Miete)?" :
-                             "Was ist dein persönlicher Höchstpreis (Kauf)?";
+    // Miete → nur "bis"
+    if (isMieteOnly) return `bis ${formatted} €`;
+
+    // letzter Wert vor "beliebig" = "ab"
+    const isLastNumber =
+      idx === pricePresets.length - 2 &&
+      pricePresets[pricePresets.length - 1] === null;
+
+    return isLastNumber ? `ab ${formatted} €` : `bis ${formatted} €`;
+  };
+
+  const fmtQM = (preset) => {
+    if (preset === null) return "beliebig";
+
+    if (preset.type === "max") return `bis ${preset.value} qm`;
+    if (preset.type === "min") return `ab ${preset.value} qm`;
+  };
 
   return (
-    <div className="space-y-8 rounded-2xl border p-6 max-w-xl mx-auto mt-auto ">
+    <div className="space-y-8 rounded-2xl border p-6 w-2/3 mx-auto mt-10">
       <p className="text-center text-sm text-gray-500">Schritt 3 von 5</p>
-      <h2 className="text-xl font-semibold text-center">{title}</h2>
 
-      <div className="flex flex-wrap gap-2 justify-center">
-        {pricePresets.map((p, i) => (
-          <Chip key={i} active={priceTo === p} onClick={() => selectPrice(p)}>
-            {fmtEUR(p)}
-          </Chip>
-        ))}
-      </div>
+      <h2 className="text-2xl font-semibold text-center text-gray-800">
+        {isMieteOnly
+          ? "Was ist dein persönlicher Höchstpreis (Miete)?"
+          : "Was ist dein persönlicher Höchstpreis (Kauf)?"}
+      </h2>
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-center">Fläche:</label>
+      {/* Preis */}
+      <div>
+        <p className="text-sm text-center text-gray-600 mb-2">
+          Wähle deinen maximalen Preis:
+        </p>
         <div className="flex flex-wrap gap-2 justify-center">
-          {spacePresets.map((s, i) => (
-            <Chip key={i} active={spaceTo === s} onClick={() => selectSpace(s)}>
-              {fmtQM(s)}
+          {pricePresets.map((p, i) => (
+            <Chip
+              key={i}
+              active={priceTo === p}
+              onClick={() => {
+                setPriceTo(p);
+                setPriceUpper(p);
+              }}
+            >
+              {fmtEUR(p, i)}
             </Chip>
           ))}
         </div>
       </div>
 
+      {/* Fläche */}
+      <div>
+        <p className="text-2xl mt-4 font-semibold text-center text-gray-800">
+          Fläche
+        </p>
+
+        <p className="text-sm text-center text-gray-600">
+          {isGrundstueck
+            ? "Wie groß soll dein Grundstück sein?"
+            : "Wie groß soll die Wohnfläche sein?"}
+        </p>
+
+        <div className="flex flex-wrap gap-2 justify-center mt-2">
+          {spacePresets.map((preset, i) => (
+            <Chip
+              key={i}
+              active={spaceValue === (preset?.value ?? null)}
+              onClick={() => {
+                setSpaceValue(preset?.value ?? null);
+                setSpacePreset(preset);
+              }}
+            >
+              {fmtQM(preset)}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      {/* Navigation */}
       <div className="flex items-center justify-between">
-        <button type="button" className="px-6 py-3 rounded-xl bg-gray-200" onClick={() => navigate("/register/step2")}>
+        <button
+          type="button"
+          className="px-6 py-3 rounded-xl bg-gray-200 text-gray-800"
+          onClick={() => navigate("/register/step2")}
+        >
           &lt; zurück
         </button>
-        <button type="button" className="px-6 py-3 rounded-xl bg-blue-900 text-white" onClick={() => navigate("/register/step4")}>
+        <button
+          type="button"
+          className="px-6 py-3 rounded-xl bg-blue-900 text-white"
+          onClick={() => navigate("/register/step4")}
+        >
           Weiter &gt;
         </button>
       </div>
     </div>
   );
 }
-
-export default Step3;   // <— wichtig

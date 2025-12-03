@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getState, setState } from "./storage/index";
 import { toggleObjectClass } from "./storage/step1";
 
-// Objektklassen (max 2)
+// Objektklassen (max 2) — bereinigt!
 const CLASS_OPTIONS = [
   { label: "Haus", value: "Haus" },
   { label: "Wohnung", value: "Wohnung" },
@@ -16,8 +16,6 @@ const CLASS_OPTIONS = [
   { label: "Halle / Lager / Produktion", value: "HalleLagerProduktion" },
   { label: "Hotel", value: "Hotel" },
   { label: "Land- / Forstwirtschaft", value: "LandForst" },
-  { label: "Microapartements", value: "Microapartements" },
-  { label: "Pflege / Alter", value: "PflegeAlter" },
   { label: "Sonstige", value: "Sonstige" },
   { label: "Studentenwohnungen", value: "Studenten" },
 ];
@@ -26,61 +24,37 @@ export default function Step1() {
   const nav = useNavigate();
   const initial = useMemo(() => getState(), []);
 
-  // initiale Auswahl aus Storage ableiten (OR-Priorität: ZV > Bauprojekt > Miete > Kauf)
   const initialTop =
-    initial.searchString === "Zwangsversteigerung"
-      ? "ZV"
-      : Array.isArray(initial.constructionStatus) &&
-        (initial.constructionStatus.includes("InPlanung") ||
-         initial.constructionStatus.includes("ImBauInSanierung"))
-      ? "Bauprojekt"
-      : initial.offerTypes?.includes("Miete")
+    initial.offerTypes?.includes("Miete")
       ? "Miete"
       : initial.offerTypes?.includes("Kauf")
       ? "Kauf"
       : null;
 
   const [selectedTop, setSelectedTop] = useState(initialTop);
-  const [selectedClasses, setSelectedClasses] = useState(initial.objectClasses || []);
+  const [selectedClasses, setSelectedClasses] = useState(
+    initial.objectClasses || []
+  );
 
-  // --- OR-Handler: genau eine Option aktiv halten und Storage setzen ---
   function selectTop(mode) {
     setSelectedTop(mode);
 
     if (mode === "Kauf") {
-      setState({
-        offerTypes: ["Kauf"],
-        constructionStatus: undefined,
-        searchString: undefined,
-      });
+      setState({ offerTypes: ["Kauf"], constructionStatus: undefined });
     } else if (mode === "Miete") {
-      setState({
-        offerTypes: ["Miete"],
-        constructionStatus: undefined,
-        searchString: undefined,
-      });
-    } else if (mode === "Bauprojekt") {
-      // Bauprojekte sind i. d. R. Kauf; Status setzen
-      setState({
-        offerTypes: ["Kauf"],
-        constructionStatus: ["InPlanung", "ImBauInSanierung"],
-        searchString: undefined,
-      });
-    } else if (mode === "ZV") {
-      // Zwangsversteigerung ≈ Kauf + Suchstring
-      setState({
-        offerTypes: ["Kauf"],
-        constructionStatus: undefined,
-        searchString: "Zwangsversteigerung",
-      });
+      setState({ offerTypes: ["Miete"], constructionStatus: undefined });
     }
   }
 
-  // Objektklassen (max 2)
+  // max 2 Objektklassen
   const onToggleClass = (val) => {
     const active = selectedClasses.includes(val);
     if (!active && selectedClasses.length >= 2) return;
-    const next = active ? selectedClasses.filter((v) => v !== val) : [...selectedClasses, val];
+
+    const next = active
+      ? selectedClasses.filter((v) => v !== val)
+      : [...selectedClasses, val];
+
     setSelectedClasses(next);
     toggleObjectClass(val);
   };
@@ -88,30 +62,30 @@ export default function Step1() {
   return (
     <div className="space-y-8 rounded-2xl border p-6 w-2/3 mx-auto mt-10">
       <p className="text-center text-sm text-gray-500">Schritt 1 von 5</p>
-      <p className="mx-auto text-center text-2xl text-gray-500 font-bold"> Angebotsart</p>
-      {/* Angebotsart – OR-Logik */}
+
+      {/* Titel */}
+
+      <p className="block text-sm font-medium mb-1 text-center">
+        Angebotsart
+      </p>
+
+      {/* Angebotsart */}
       <div className="mx-auto max-w-md">
         <div className="flex items-center justify-center gap-2 flex-wrap">
           {[
             { key: "Kauf", label: "Kauf" },
             { key: "Miete", label: "Miete" },
-            { key: "Bauprojekt", label: "Bauprojekt" },
-            { key: "ZV", label: "Zwangsversteigerung" },
           ].map((b) => (
             <button
               key={b.key}
               type="button"
               onClick={() => selectTop(b.key)}
-              className={`px-4 py-2 rounded-full border ${
-                selectedTop === b.key ? "bg-blue-600 text-white" : "bg-white"
-              }`}
-              title={
-                b.key === "Bauprojekt"
-                  ? "setzt constructionStatus: InPlanung + ImBauInSanierung"
-                  : b.key === "ZV"
-                  ? 'setzt searchString: "Zwangsversteigerung"'
-                  : ""
-              }
+              className={`px-4 py-2 rounded-full border text-sm transition
+                ${
+                  selectedTop === b.key
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+                }`}
             >
               {b.label}
             </button>
@@ -119,10 +93,15 @@ export default function Step1() {
         </div>
       </div>
 
-      {/* Objektklassen (max 2) */}
+      {/* Objektarten */}
       <div className="space-y-2">
-        <p className="mx-auto text-center text-2xl text-gray-500 font-bold"> Objektart</p>
-        <p className="text-center text-sm text-gray-600">Wähle bis zu zwei Stück aus:</p>
+        <p className="block text-sm font-medium mb-1 text-center">
+          Objektart
+        </p>
+        <p className="text-center text-sm text-gray-600">
+          Wähle bis zu zwei Stück aus:
+        </p>
+
         <div className="flex flex-wrap gap-2 justify-center">
           {CLASS_OPTIONS.map((opt) => {
             const active = selectedClasses.includes(opt.value);
@@ -131,12 +110,16 @@ export default function Step1() {
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => onToggleClass(opt.value)}
                 disabled={disabled}
-                className={`px-3 py-2 rounded-full border text-sm
-                  ${active ? "bg-blue-600 text-white" : "bg-white"}
-                  ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                title={`objectClasses: ${opt.value}`}
+                onClick={() => onToggleClass(opt.value)}
+                className={`px-4 py-2 rounded-full border text-sm transition
+                  ${
+                    active
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+                  }
+                  ${disabled ? "opacity-50 cursor-not-allowed" : ""}
+                `}
               >
                 {opt.label}
               </button>
@@ -145,8 +128,8 @@ export default function Step1() {
         </div>
       </div>
 
-      {/* Weiter */}
-      <div className="flex justify-center">
+      {/* Navigation */}
+      <div className="flex justify-center mt-4">
         <button
           type="button"
           className="px-6 py-3 rounded-xl bg-blue-900 text-white"

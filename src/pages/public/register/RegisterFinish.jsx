@@ -13,6 +13,7 @@ export default function RegisterFinish() {
   const [lastName,  setLast]  = useState("");
   const [email,     setEmail] = useState("");
   const [pw,        setPw]    = useState("");
+  const [pw2,       setPw2]   = useState("");
 
   const [acceptTerms, setAcceptTerms]       = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
@@ -26,36 +27,50 @@ export default function RegisterFinish() {
     firstName.trim() &&
     lastName.trim() &&
     email.trim() &&
-    pw.trim();
+    pw.trim() &&
+    pw2.trim();
 
   async function onRegister(e) {
     e.preventDefault();
     if (!canSubmit) return;
+
+    if (pw !== pw2) {
+      setErr("Die Passwörter stimmen nicht überein.");
+      return;
+    }
 
     setBusy(true);
     setErr("");
 
     try {
       // 1) Auth
-      const { user } = await createUserWithEmailAndPassword(auth, email.trim(), pw);
+      const { user } = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        pw
+      );
 
       // 2) Firestore-Profil
-      await setDoc(doc(db, "users", user.uid), {
-        firstName: firstName.trim(),
-        lastName:  lastName.trim(),
-        email:     email.trim().toLowerCase(),
-        role:      "user",                    // <<< automatisch user
-        stripeStatus: "none",                 // <<< Stripe nicht bezahlt
-        stripeCustomerId: null,               // <<< wird später gefüllt
-        marketingOptIn,
-        acceptedTermsAt: serverTimestamp(),
-        createdAt: serverTimestamp()
-      }, { merge: true });
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          firstName: firstName.trim(),
+          lastName:  lastName.trim(),
+          email:     email.trim().toLowerCase(),
+          role:           "user",
+          stripeStatus:   "none",
+          stripeCustomerId: null,
+          marketingOptIn,
+          acceptedTermsAt: serverTimestamp(),
+          createdAt:        serverTimestamp(),
+        },
+        { merge: true }
+      );
 
       // 3) Filter sichern
       await saveCurrentFiltersForUser(user.uid);
 
-      // 4) Weiter zum Dashboard
+      // 4) Weiter zum Dashboard (Payment-Overlay greift dort)
       nav("/dashboard");
     } catch (e) {
       setErr(e.message || "Fehler bei der Registrierung");
@@ -65,10 +80,16 @@ export default function RegisterFinish() {
   }
 
   return (
-    <div className="max-w-md mx-auto rounded-2xl border p-6">
-      <h1 className="text-xl font-semibold mb-4 text-center">Registrieren</h1>
+    <div className="space-y-4 rounded-2xl border p-6 w-2/3 mx-auto mt-10 bg-white">
+      <h1 className="text-xl font-semibold text-center">
+        Dein Immobot-Konto
+      </h1>
+      <p className="text-sm text-gray-600 text-center">
+        Lege jetzt dein Konto an. Im nächsten Schritt wählst du dein Abo
+        und aktivierst deinen Zugang.
+      </p>
 
-      <form onSubmit={onRegister} className="space-y-3">
+      <form onSubmit={onRegister} className="space-y-3 max-w-md mx-auto">
         <div className="flex gap-2">
           <input
             type="text"
@@ -95,6 +116,7 @@ export default function RegisterFinish() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          autoComplete="email"
         />
 
         <input
@@ -104,6 +126,17 @@ export default function RegisterFinish() {
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           required
+          autoComplete="new-password"
+        />
+
+        <input
+          type="password"
+          className="w-full rounded-lg border px-3 py-2"
+          placeholder="Passwort wiederholen"
+          value={pw2}
+          onChange={(e) => setPw2(e.target.value)}
+          required
+          autoComplete="new-password"
         />
 
         <label className="flex items-start gap-3 text-sm">
@@ -116,13 +149,24 @@ export default function RegisterFinish() {
           />
           <span>
             Ich akzeptiere die{" "}
-            <Link to="/terms" className="underline" target="_blank" rel="noreferrer">
+            <Link
+              to="/terms"
+              className="underline"
+              target="_blank"
+              rel="noreferrer"
+            >
               AGB
             </Link>{" "}
             und die{" "}
-            <Link to="/privacy" className="underline" target="_blank" rel="noreferrer">
+            <Link
+              to="/privacy"
+              className="underline"
+              target="_blank"
+              rel="noreferrer"
+            >
               Datenschutzerklärung
-            </Link>.
+            </Link>
+            .
           </span>
         </label>
 
@@ -133,18 +177,28 @@ export default function RegisterFinish() {
             checked={marketingOptIn}
             onChange={(e) => setMarketingOptIn(e.target.checked)}
           />
-          <span>Ich möchte hilfreiche Updates & Angebote per E-Mail erhalten (optional).</span>
+          <span>
+            Ich möchte hilfreiche Updates & Angebote per E-Mail erhalten
+            (optional).
+          </span>
         </label>
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && (
+          <p className="text-sm text-red-600 text-center">{err}</p>
+        )}
 
         <button
           type="submit"
           disabled={!canSubmit}
           className="w-full px-4 py-3 rounded-xl bg-blue-900 text-white disabled:opacity-60"
         >
-          {busy ? "Speichere…" : "Konto erstellen & Filter sichern"}
+          {busy ? "Speichere…" : "Weiter"}
         </button>
+
+        <p className="text-xs text-gray-500 mt-2 text-center">
+          Keine Sorge: Du kannst dein Abo im nächsten Schritt wählen und
+          später jederzeit kündigen.
+        </p>
       </form>
     </div>
   );

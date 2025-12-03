@@ -1,11 +1,11 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useEffect, useState } from "react";
-import { useAuth } from "../../contexts/AuthContext"
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function usePaymentStatus() {
   const { user } = useAuth();
-  const [status, setStatus] = useState("loading"); 
+  const [status, setStatus] = useState("loading");
   const [userDoc, setUserDoc] = useState(null);
 
   useEffect(() => {
@@ -23,5 +23,11 @@ export default function usePaymentStatus() {
     load();
   }, [user]);
 
-  return { status, userDoc };
+  return {
+    status,
+    userDoc,
+    isPaid: status === "paid",
+    loading: status === "loading"
+  };
 }
+//denk an peding usw ander status

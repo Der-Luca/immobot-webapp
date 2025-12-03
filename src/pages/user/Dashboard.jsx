@@ -17,21 +17,20 @@ export default function Dashboard() {
   if (loading) return <p style={{ padding: 20 }}>Lade Filter…</p>;
 
   return (
-    <RequirePayment
-      content={
-        <div style={{ padding: 30 }}>
-          <h1 style={{ fontSize: 40, marginBottom: 20 }}>Dein Dashboard</h1>
+   <RequirePayment>
+  <div style={{ padding: 30 }}>
+    <h1 style={{ fontSize: 40, marginBottom: 20 }}>Dein Dashboard</h1>
 
-          <div style={{ display: "grid", gap: 20 }}>
-            <LocationCard filters={filters} user={user} />
-            <ObjectCard filters={filters} user={user} />
-            <PriceCard filters={filters} user={user} />
-            <ExtrasCard filters={filters} user={user} />
-            <AdvancedFiltersCard filters={filters} user={user} />
-          </div>
-        </div>
-      }
-    />
+    <div style={{ display: "grid", gap: 20 }}>
+      <LocationCard filters={filters} user={user} />
+      <ObjectCard filters={filters} user={user} />
+      <PriceCard filters={filters} user={user} />
+      <ExtrasCard filters={filters} user={user} />
+      <AdvancedFiltersCard filters={filters} user={user} />
+    </div>
+  </div>
+</RequirePayment>
+
   );
 }
 

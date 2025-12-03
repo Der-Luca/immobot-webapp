@@ -34,49 +34,64 @@ export default function Step4() {
     AMENITIES.reduce((acc, a) => ({ ...acc, [a.key]: !!s4[a.key] }), {})
   );
 
-  // Sichtbarkeit der Ausstattung (erst nach Klick auf „Noch mehr Filter …“)
+  // Sichtbarkeit der Ausstattung
   const [showAmenities, setShowAmenities] = useState(false);
 
   function onToggleAmenity(key) {
     toggleBool(key); // schreibt in storage/step4.js
-    setAmen(prev => ({ ...prev, [key]: !prev[key] }));
+    setAmen((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   return (
-    <div className="space-y-6 rounded-2xl border p-6">
-      <p className="text-center text-sm text-gray-500">Schritt 4 von 5 (optional)</p>
-   
+    <div className="space-y-6 rounded-2xl border p-6 w-2/3 mx-auto mt-10">
+      <p className="text-center text-sm text-gray-500">
+        Schritt 4 von 5 (optional)
+      </p>
 
-      {/* ————— Startzustand: NUR Frage + zwei CTAs ————— */}
+      {/* Startzustand: Frage + zwei CTAs */}
       {!showAmenities && (
-        <div className="">
+        <div>
           <p className="text-sm text-gray-700 mb-3 text-center">
-            Benötigst du weitere Filter?
+            Möchtest du noch weitere Filter nutzen?
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <button
               type="button"
-              className="px-5 py-3 rounded-xl bg-white border hover:bg-gray-100"
+              className="px-5 py-3 rounded-xl bg-white border border-gray-300 text-sm text-gray-800 hover:bg-gray-100 transition"
               onClick={() => setShowAmenities(true)}
             >
-             Ja mehr Filter bitte…
+              Ja, unbedingt
             </button>
             <button
               type="button"
-              className="px-5 py-3 rounded-xl bg-blue-900 text-white"
+              className="px-5 py-3 rounded-xl bg-blue-900 text-white text-sm"
               onClick={() => navigate("/register/finish")}
             >
-              Nein... Jetzt registrieren
+              Nein, jetzt registrieren
             </button>
           </div>
         </div>
       )}
 
-      {/* ————— Nach Klick: Ausstattung wird eingeblendet + „Weiter zu Schritt 5“ ————— */}
+      {/* Nach Klick: Ausstattung + Hinweis */}
       {showAmenities && (
         <>
-              <h2 className="text-xl font-semibold text-center">Ausstattung</h2>
-          <div className="flex-8 mx-auto w-1/3 ">
+          <h2 className="text-xl font-semibold text-center">Ausstattung</h2>
+
+          <p className="text-xs sm:text-sm text-gray-600 text-center max-w-xl mx-auto">
+            Achtung: Jeder weitere Filter kann die Trefferquote reduzieren.{" "}
+            <a
+              href="https://immobot.pro/funktionen/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Siehe FAQ
+            </a>
+            .
+          </p>
+
+          <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto mt-4">
             {AMENITIES.map((a) => {
               const active = !!amen[a.key];
               return (
@@ -84,9 +99,12 @@ export default function Step4() {
                   key={a.key}
                   type="button"
                   onClick={() => onToggleAmenity(a.key)}
-                  className={` m-1 px-3 py-2 rounded-full  border text-sm text-left ${
-                    active ? "bg-blue-600 text-white" : "bg-white"
-                  }`}
+                  className={`px-4 py-2 rounded-full border text-sm transition
+                    ${
+                      active
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+                    }`}
                   title={a.key}
                 >
                   {a.label}
@@ -94,28 +112,11 @@ export default function Step4() {
               );
             })}
           </div>
-
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              className="text-sm underline"
-              onClick={() => setShowAmenities(false)}
-            >
-              Auswahl ausblenden
-            </button>
-            <button
-              type="button"
-              className="px-5 py-3 rounded-xl bg-blue-900 text-white"
-              onClick={() => navigate("/register/step5")}
-            >
-              Weiter &gt;
-            </button>
-          </div>
         </>
       )}
 
-      {/* Navigation unten – „Weiter“ nur sinnvoll, wenn Amenities offen sind */}
-      <div className="flex items-center justify-between">
+      {/* Navigation unten – immer eine Zeile, Buttons gleiche Höhe */}
+      <div className="flex items-center justify-between mt-6">
         <button
           type="button"
           className="px-6 py-3 rounded-xl bg-gray-200"
@@ -123,6 +124,16 @@ export default function Step4() {
         >
           &lt; zurück
         </button>
+
+        {showAmenities && (
+          <button
+            type="button"
+            className="px-6 py-3 rounded-xl bg-blue-900 text-white"
+            onClick={() => navigate("/register/step5")}
+          >
+            Weiter &gt;
+          </button>
+        )}
       </div>
     </div>
   );
