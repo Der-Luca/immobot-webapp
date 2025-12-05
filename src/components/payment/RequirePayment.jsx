@@ -5,8 +5,8 @@ import usePaymentStatus from "./usePaymentStatus";
 import PaymentOverlay from "./PaymentOverlay";
 
 // deine Price-IDs
-const PRICE_MONTHLY = "price_1RSfBkDhGVwiGXJYKqj0kmXx";
-const PRICE_YEARLY  = "price_1RSfECDhGVwiGXJY7a2oCzD9";
+const PRICE_MONTHLY = "price_1SaeE9DhGVwiGXJYxm5oZdI6";
+const PRICE_YEARLY  = "price_1SaeGDDhGVwiGXJYn2kbMjuh";
 
 export default function RequirePayment({ children }) {
   const { isPaid, loading } = usePaymentStatus();

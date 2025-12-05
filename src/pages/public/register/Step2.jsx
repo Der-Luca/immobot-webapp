@@ -146,15 +146,20 @@ export default function Step2() {
   }
 
   return (
-    <div className="space-y-8 rounded-2xl border p-6 w-2/3 mx-auto mt-10">
-      <p className="text-center text-sm text-gray-500">Schritt 2 von 5</p>
+    // ÄNDERUNGEN: Mobile -> kein Border, mt-2, p-4. Desktop -> Border, mt-10, p-6.
+    <div className="
+      w-full mx-auto max-w-2xl bg-white space-y-6 md:space-y-8
+      p-4 mt-2
+      md:p-6 md:mt-10 md:w-2/3 md:border md:rounded-2xl md:shadow-sm
+    ">
+      <p className="text-center text-xs md:text-sm text-gray-500">Schritt 2 von 5</p>
 
-      <h2 className="text-xl font-semibold text-center">
+      <h2 className="text-lg md:text-xl font-semibold text-center leading-tight">
         Wo sollen wir etwas für dich finden?
       </h2>
 
       {/* Adresse */}
-      <div className="mx-auto max-w-md relative">
+      <div className="mx-auto max-w-md relative w-full">
         <label className="block text-sm font-medium mb-1 text-center">
           Ort/Stadt eingeben
         </label>
@@ -163,18 +168,19 @@ export default function Step2() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="z. B. Freiburg im Breisgau"
-          className="w-full rounded-lg border px-3 py-2"
+          // Py-3 für Mobile macht das Tippen einfacher
+          className="w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
           }}
         />
 
         {suggestions.length > 0 && (
-          <div className="absolute left-0 right-0 mt-1 rounded-lg border bg-white shadow z-50">
+          <div className="absolute left-0 right-0 mt-1 rounded-lg border bg-white shadow-lg z-[9999] max-h-60 overflow-y-auto">
             {suggestions.map((s, i) => (
               <div
                 key={i}
-                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                className="px-4 py-3 hover:bg-gray-100 cursor-pointer text-sm border-b last:border-0"
                 onClick={() => onPickSuggestion(s)}
               >
                 {s.label}
@@ -196,7 +202,7 @@ export default function Step2() {
               key={km}
               type="button"
               onClick={() => setRadius(km)}
-              className={`px-4 py-2 rounded-full border text-sm transition
+              className={`px-3 py-2 md:px-4 md:py-2 rounded-full border text-sm transition
                 ${
                   Number(radius) === km
                     ? "bg-blue-600 text-white border-blue-600"
@@ -210,30 +216,27 @@ export default function Step2() {
       </div>
 
       {/* Karte — locked */}
-      <div
-        ref={mapRef}
-        style={{
-          height: 400,
-          borderRadius: 12,
-          border: "1px solid #ccc",
-          position: "relative",
-          pointerEvents: "none", // WICHTIG → keine Interaktion möglich
-        }}
-      />
+      {/* Container mit Tailwind Klassen für Höhe (h-64 mobile, h-96 desktop) */}
+      <div 
+        className="w-full h-64 md:h-[400px] rounded-xl border border-gray-300 relative overflow-hidden"
+        style={{ pointerEvents: "none" }} // Interaktion weiterhin deaktiviert
+      >
+        <div ref={mapRef} className="w-full h-full" />
+      </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 mt-4">
         <button
           type="button"
-          className="px-6 py-3 rounded-xl bg-gray-200"
+          className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition"
           onClick={() => navigate("/register/step1")}
         >
-          &lt; zurück
+          &lt; Zurück
         </button>
 
         <button
           type="button"
-          className="px-6 py-3 rounded-xl bg-blue-900 text-white"
+          className="px-8 py-3 rounded-xl bg-blue-900 text-white font-medium shadow-sm hover:bg-blue-800 transition active:scale-95"
           onClick={() => navigate("/register/step3")}
         >
           Schritt 3 &gt;
