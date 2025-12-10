@@ -149,3 +149,50 @@ exports.handleStripeWebhook = onRequest(
     }
   }
 );
+
+
+// ============================================================================
+// TRACK OFFER CLICK  (E-Mail Tracking)
+// ============================================================================
+exports.trackOfferClick = onRequest(
+  { region: "europe-west1" },
+  async (req, res) => {
+    try {
+      const offerId = req.query.offerId || req.path.split("/").pop();
+
+      if (!offerId) {
+        return res.status(400).send("Missing offerId");
+      }
+
+      // Firestore-Eintrag lesen
+      const ref = db.collection("offerRedirects").doc(offerId);
+      const snap = await ref.get();
+
+      if (!snap.exists) {
+        return res.status(404).send("Offer redirect not found");
+      }
+
+      const data = snap.data();
+      const redirectUrl = data.redirectUrl;
+
+      if (!redirectUrl) {
+        return res.status(500).send("Missing redirectUrl");
+      }
+
+      // Klick speichern
+      await db.collection("clickEvents").add({
+        offerId,
+        userId: data.userId || null,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        source: "email"
+      });
+
+      // Redirect ausführen
+      return res.redirect(redirectUrl);
+
+    } catch (err) {
+      console.error("Tracking error:", err);
+      return res.status(500).send("Internal server error");
+    }
+  }
+);
