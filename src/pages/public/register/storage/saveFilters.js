@@ -58,25 +58,12 @@ function sanitizeForFirestore(input) {
 
 /**
  * Speichert den aktuellen Filterzustand als JSON beim User.
- * - users/{uid}/searchFilters/default
- * - optional duplizieren nach users/{uid} -> lastSearch
+ * - users/{uid} -> lastSearch
  */
 export async function saveCurrentFiltersForUser(uid) {
-  const raw = getState();                         // dein zusammengeführtes JSON (Step1–5)
-  const filters = sanitizeForFirestore(raw);      // 🚿 wichtig: undefined/kaputte Werte entfernen
+  const raw = getState();                    // dein zusammengeführtes JSON (Step1–5)
+  const filters = sanitizeForFirestore(raw); // 🚿 undefined/kaputte Werte entfernen
 
-  const filterDocRef = doc(db, "users", uid, "searchFilters", "default");
-  await setDoc(
-    filterDocRef,
-    {
-      filters,           // komplette (bereinigte) JSON
-      version: 1,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  // (Optional) kurze Kopie auf Root für schnellen Zugriff
   const userDocRef = doc(db, "users", uid);
   await setDoc(
     userDocRef,
