@@ -1,4 +1,6 @@
-// functions/index.js
+// ============================================================================
+// IMPORTS (Firebase Functions v2)
+// ============================================================================
 const { onCall, onRequest } = require("firebase-functions/v2/https");
 const { defineString } = require("firebase-functions/params");
 const admin = require("firebase-admin");
@@ -6,48 +8,53 @@ const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-// PARAMS (werden aus .env geladen)
+
+// ============================================================================
+// PARAMS
+// ============================================================================
 const STRIPE_SECRET = defineString("STRIPE_SECRET");
 const STRIPE_WEBHOOK_SECRET = defineString("STRIPE_WEBHOOK_SECRET");
 const PRICE_MONTHLY = defineString("PRICE_MONTHLY");
 const PRICE_YEARLY = defineString("PRICE_YEARLY");
 const FRONTEND_BASE_URL = defineString("FRONTEND_BASE_URL");
 
-// Stripe muss LAZY geladen werden (erst zur Runtime, nicht global!)
+
+// ============================================================================
+// STRIPE INITIALIZER
+// ============================================================================
 const getStripe = () => {
   const key = STRIPE_SECRET.value();
   return require("stripe")(key);
 };
 
+
 // ============================================================================
-// CREATE CHECKOUT SESSION
+// CREATE CHECKOUT SESSION (HTTPS Callable)
 // ============================================================================
 exports.createCheckoutSession = onCall(
-  {
-    region: "europe-west1",
-  },
+  { region: "europe-west1" },
   async (request) => {
     const { data, auth } = request;
 
     if (!auth) throw new Error("Login erforderlich.");
-
     const uid = auth.uid;
     const priceId = data.priceId;
 
     if (!priceId) throw new Error("priceId fehlt");
 
     const stripe = getStripe();
-
     const userRef = db.collection("users").doc(uid);
     const snap = await userRef.get();
     const userData = snap.data() || {};
 
     let customerId = userData.stripeCustomerId;
 
-    // Stripe-Customer erzeugen
     if (!customerId) {
       const userRecord = await admin.auth().getUser(uid).catch(() => null);
-      const email = userRecord?.email || userData.email || `user-${uid}@example.com`;
+      const email =
+        userRecord?.email ||
+        userData.email ||
+        `user-${uid}@example.com`;
 
       const customer = await stripe.customers.create({
         email,
@@ -55,7 +62,10 @@ exports.createCheckoutSession = onCall(
       });
 
       customerId = customer.id;
-      await userRef.set({ stripeCustomerId: customerId }, { merge: true });
+      await userRef.set(
+        { stripeCustomerId: customerId },
+        { merge: true }
+      );
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -70,7 +80,10 @@ exports.createCheckoutSession = onCall(
     });
 
     await userRef.set(
-      { stripeStatus: "pending", stripeCheckoutSessionId: session.id },
+      {
+        stripeStatus: "pending",
+        stripeCheckoutSessionId: session.id,
+      },
       { merge: true }
     );
 
@@ -78,13 +91,12 @@ exports.createCheckoutSession = onCall(
   }
 );
 
+
 // ============================================================================
-// STRIPE WEBHOOK
+// STRIPE WEBHOOK (HTTPS onRequest v2)
 // ============================================================================
 exports.handleStripeWebhook = onRequest(
-  {
-    region: "europe-west1",
-  },
+  { region: "europe-west1" },
   async (req, res) => {
     const stripe = getStripe();
     const webhookSecret = STRIPE_WEBHOOK_SECRET.value();
@@ -100,7 +112,7 @@ exports.handleStripeWebhook = onRequest(
     try {
       event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
     } catch (err) {
-      console.error("❌ Ungültige Signatur", err.message);
+      console.error("❌ Ungültige Signatur:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
@@ -110,6 +122,7 @@ exports.handleStripeWebhook = onRequest(
       switch (event.type) {
         case "checkout.session.completed": {
           const uid = obj.metadata?.firebaseUid;
+
           if (uid) {
             await db.collection("users").doc(uid).set(
               {
@@ -134,17 +147,21 @@ exports.handleStripeWebhook = onRequest(
             .get();
 
           if (!snap.empty) {
-            await snap.docs[0].ref.set({ stripeStatus: "cancelled" }, { merge: true });
+            await snap.docs[0].ref.set(
+              { stripeStatus: "cancelled" },
+              { merge: true }
+            );
           }
+          break;
         }
 
         default:
-          console.log("Ignored event:", event.type);
+          console.log("ℹ️ Ignored event:", event.type);
       }
 
       res.json({ received: true });
     } catch (err) {
-      console.error("Webhook handler error", err);
+      console.error("❌ Fehler im Webhook Handler", err);
       res.status(500).send("Fehler im Webhook");
     }
   }
@@ -152,47 +169,75 @@ exports.handleStripeWebhook = onRequest(
 
 
 // ============================================================================
-// TRACK OFFER CLICK  (E-Mail Tracking)
+// TRACK OFFER CLICK (HTTPS onRequest v2)
 // ============================================================================
 exports.trackOfferClick = onRequest(
   { region: "europe-west1" },
   async (req, res) => {
     try {
-      const offerId = req.query.offerId || req.path.split("/").pop();
+      // redirectId kommt als Query-Parameter
+      // z.B. ?redirectId=21KuoRPiAW7Jq8hzYh6C&userId=XYZ
+      const redirectId = req.query.redirectId;
+      const userId = req.query.userId || "unknown";
 
-      if (!offerId) {
-        return res.status(400).send("Missing offerId");
+      if (!redirectId) {
+        return res.status(400).json({
+          error: "Missing redirectId parameter.",
+        });
       }
 
-      // Firestore-Eintrag lesen
-      const ref = db.collection("offerRedirects").doc(offerId);
-      const snap = await ref.get();
+      console.log("📥 Incoming click event:", { redirectId, userId });
 
-      if (!snap.exists) {
-        return res.status(404).send("Offer redirect not found");
+      // 1. Angebot aus offerRedirects laden
+      const redirectDocRef = db.collection("offerRedirects").doc(redirectId);
+      const redirectDoc = await redirectDocRef.get();
+
+      if (!redirectDoc.exists) {
+        console.error("❌ Redirect not found:", redirectId);
+        return res.status(404).json({
+          error: "Redirect document not found.",
+        });
       }
 
-      const data = snap.data();
-      const redirectUrl = data.redirectUrl;
+      const offerData = redirectDoc.data();
 
-      if (!redirectUrl) {
-        return res.status(500).send("Missing redirectUrl");
-      }
+      // Geomap-Offer-ID aus Feld "id" im Angebot
+      const geomapOfferId = offerData.id || null;
 
-      // Klick speichern
-      await db.collection("clickEvents").add({
-        offerId,
-        userId: data.userId || null,
+      // 2. Klick-Event speichern
+      const clickEvent = {
+        redirectId,                         // Firestore-Dokument-ID aus offerRedirects
+        userId,                             // User, der geklickt hat (aus Query)
+        geomapOfferId,                      // Geomap Offer-ID aus dem Angebot
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        source: "email"
-      });
+        source: req.query.source || "redirect",
+      };
 
-      // Redirect ausführen
-      return res.redirect(redirectUrl);
+      await db.collection("clickEvents").add(clickEvent);
+
+      console.log("✅ Click event stored:", clickEvent);
+
+      // 3. User weiterleiten
+      const targetUrl = offerData.redirectUrl;
+
+      if (!targetUrl) {
+        console.error("❌ redirectUrl missing in offerRedirects doc:", redirectId);
+        return res.status(500).json({
+          error: "redirectUrl missing in offerRedirects doc.",
+        });
+      }
+
+      console.log("➡️ Redirecting user to:", targetUrl);
+      return res.redirect(targetUrl);
 
     } catch (err) {
-      console.error("Tracking error:", err);
-      return res.status(500).send("Internal server error");
+      console.error("❌ Error in trackOfferClick:", err);
+      return res.status(500).json({
+        error: "Internal server error",
+        details: err.message,
+      });
     }
   }
 );
+
+
