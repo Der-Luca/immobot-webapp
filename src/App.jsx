@@ -2,8 +2,11 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import PublicLayout from "./layouts/PublicLayout";
 import UserLayout from "./layouts/UserLayout";
 import AdminLayout from "./layouts/AdminLayout";
-
+import AdminUserDetails from "./pages/admin/user/AdminUserDetails";  
+import AdminUserList from "./pages/admin/user/AdminUserList";
 import Login from "./pages/public/Login";
+import AdminClicks from "./pages/admin/clicks/AdminClicks";
+import AdminOffers from "./pages/admin/offers/AdminOffers";
 
 // Register-Flow (öffentlich)
 import Step1 from "./pages/public/register/Step1";
@@ -21,6 +24,8 @@ import Dashboard from "./pages/user/Dashboard";
 import AdminDashboard from "./pages/admin/AdminDashbaord";
 
 import RootRedirect from "./RootRedirect";
+import UserProfile from "./pages/user/UserProfile";
+
 
 export default function App() {
   return (
@@ -54,6 +59,7 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+         <Route path="/dashboard/profile" element={<UserProfile />} />
       </Route>
 
       {/* ADMIN (geschützt + admin) */}
@@ -65,6 +71,11 @@ export default function App() {
         }
       >
         <Route path="/admin" element={<AdminDashboard />} />
+<Route path="/admin/users" element={<AdminUserList />} />
+<Route path="/admin/user/:uid" element={<AdminUserDetails />} />
+<Route path="/admin/clicks" element={<AdminClicks />} />
+<Route path="/admin/offers" element={<AdminOffers />} />
+
       </Route>
 
       {/* Fallback */}
