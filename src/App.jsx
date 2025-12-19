@@ -7,6 +7,7 @@ import AdminUserList from "./pages/admin/user/AdminUserList";
 import Login from "./pages/public/Login";
 import AdminClicks from "./pages/admin/clicks/AdminClicks";
 import AdminOffers from "./pages/admin/offers/AdminOffers";
+import AdminOfferDetails from "./pages/admin/offers/AdminOfferDetails";
 
 // Register-Flow (öffentlich)
 import Step1 from "./pages/public/register/Step1";
@@ -75,6 +76,8 @@ export default function App() {
 <Route path="/admin/user/:uid" element={<AdminUserDetails />} />
 <Route path="/admin/clicks" element={<AdminClicks />} />
 <Route path="/admin/offers" element={<AdminOffers />} />
+<Route path="/admin/offers/:offerId" element={<AdminOfferDetails />} />
+
 
       </Route>
 

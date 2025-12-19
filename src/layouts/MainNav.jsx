@@ -7,34 +7,33 @@ export default function MainNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Verhindert Flackern beim Laden
-  if (!ready) return null;
-  // Zeigt nichts an, wenn nicht eingeloggt
-  if (!user) return null;
-
-  const isAdmin = role === "admin";
-  const firstName = user?.firstName || user?.email?.split("@")[0] || "U";
-  const initial = firstName.charAt(0).toUpperCase();
-
-  // Schließt das Menü, wenn man daneben klickt
+  // ✅ HOOKS IMMER ZUERST
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // ✅ ERST DANACH RETURN-LOGIK
+  if (!ready) return null;
+  if (!user) return null;
+
+  const isAdmin = role === "admin";
+  const firstName = user?.firstName || user?.email?.split("@")[0] || "U";
+  const initial = firstName.charAt(0).toUpperCase();
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 h-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
         <div className="flex justify-between items-center h-full">
           
-          {/* LINKER BEREICH: LOGO & NAVI */}
+          {/* LINKER BEREICH */}
           <div className="flex items-center gap-8">
-            {/* Logo */}
             <Link to="/dashboard" className="flex items-center gap-2 group">
               <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:bg-indigo-700 transition">
                 I
@@ -44,7 +43,6 @@ export default function MainNav() {
               </span>
             </Link>
 
-            {/* Links Desktop */}
             <div className="hidden md:flex items-center gap-6">
               <NavLink to="/dashboard">Dashboard</NavLink>
               {isAdmin && (
@@ -55,55 +53,60 @@ export default function MainNav() {
             </div>
           </div>
 
-          {/* RECHTER BEREICH: USER DROPDOWN */}
+          {/* RECHTER BEREICH */}
           <div className="relative ml-auto" ref={menuRef}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="flex items-center gap-3 p-1 rounded-full hover:bg-gray-100 transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <div className="hidden sm:block text-right mr-1">
-                <p className="text-sm font-medium text-gray-700 leading-none">{firstName}</p>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wide">{isAdmin ? "Admin" : "User"}</p>
+                <p className="text-sm font-medium text-gray-700 leading-none">
+                  {firstName}
+                </p>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wide">
+                  {isAdmin ? "Admin" : "User"}
+                </p>
               </div>
 
-              {/* Avatar Circle */}
               <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white">
                 {initial}
               </div>
             </button>
 
-            {/* DAS DROPDOWN MENÜ */}
             {isMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in zoom-in-95 duration-200 transform origin-top-right">
-                
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2">
                 <div className="px-4 py-2 border-b border-gray-100 sm:hidden">
-                  <p className="text-sm font-semibold text-gray-900">{firstName}</p>
-                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {firstName}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {user.email}
+                  </p>
                 </div>
 
                 <Link
-                  to="/profile" // Stelle sicher, dass du diese Route hast!
+                  to="/dashboard/profile"
                   onClick={() => setIsMenuOpen(false)}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
                 >
                   Mein Profil
                 </Link>
 
                 {isAdmin && (
-                   <Link
-                   to="/admin" 
-                   onClick={() => setIsMenuOpen(false)}
-                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors md:hidden"
-                 >
-                   Admin Bereich
-                 </Link>
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 md:hidden"
+                  >
+                    Admin Bereich
+                  </Link>
                 )}
-                
+
                 <div className="my-1 border-t border-gray-100" />
-                
+
                 <button
                   onClick={logout}
-                  className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                 >
                   Abmelden
                 </button>
@@ -116,7 +119,6 @@ export default function MainNav() {
   );
 }
 
-// Hilfskomponente für Links
 function NavLink({ to, children, activeColor = "text-gray-900" }) {
   return (
     <Link
