@@ -1,91 +1,126 @@
-import { motion, useReducedMotion } from "framer-motion";
-
-function Box({ delay = 0, dark = false }) {
-  const prefersReducedMotion = useReducedMotion();
-  const anim = prefersReducedMotion
-    ? {}
-    : {
-        y: [0, -18, 0],
-        scale: [1, 1.06, 1],
-        rotate: [0, -2, 0],
-        boxShadow: [
-          "0 8px 20px rgba(0,0,0,0.08)",
-          "0 16px 28px rgba(0,0,0,0.12)",
-          "0 8px 20px rgba(0,0,0,0.08)",
-        ],
-      };
-
-  return (
-    <motion.div
-      className={`h-10 w-10 rounded-xl ${dark ? "bg-white" : "bg-gray-900"}`}
-      style={{
-        background:
-          dark
-            ? "linear-gradient(135deg, #fff 0%, #d4d4d4 100%)"
-            : "linear-gradient(135deg, #111827 0%, #1f2937 100%)",
-      }}
-      initial={{ y: 0, scale: 1, rotate: 0 }}
-      animate={anim}
-      transition={{
-        duration: 0.9,
-        repeat: Infinity,
-        ease: "easeInOut",
-        delay,
-      }}
-    />
-  );
-}
+import { motion } from "framer-motion";
 
 export default function LoadingScreen({
-  label = "Wird geladen…",
+  label = "System wird initialisiert...",
   theme = "light", // "light" | "dark"
 }) {
-  const dark = theme === "dark";
+  const isDark = theme === "dark";
+
+  // Farben basierend auf Theme
+  const bgClass = isDark ? "bg-[#050505]" : "bg-[#f8f9fa]";
+  const textClass = isDark ? "text-white/60" : "text-black/60";
+  
+  // Der "Glow" hinter dem Loader
+  const glowColor = isDark 
+    ? "bg-indigo-500/20" 
+    : "bg-blue-400/20";
+
+  // Die Farbe der tanzenden Quadrate
+  const boxColor = isDark ? "bg-white" : "bg-gray-900";
+
+  // Animations-Varianten für die 4 Boxen
+  const containerVariants = {
+    animate: {
+      rotate: [0, 90, 180, 270, 360],
+      transition: {
+        duration: 4, // Langsame, majestätische Rotation
+        ease: "linear",
+        repeat: Infinity,
+      },
+    },
+  };
+
+  const itemVariants = {
+    initial: { scale: 0.5, opacity: 0 },
+    animate: {
+      scale: [1, 0.8, 1],
+      borderRadius: ["20%", "50%", "20%"], // Morphing zu Kreis und zurück
+      gap: ["0px", "12px", "0px"], // "Atmen" (Auseinander/Zusammen)
+      transition: {
+        duration: 2,
+        ease: "easeInOut",
+        repeat: Infinity,
+      },
+    },
+  };
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] grid place-items-center overflow-hidden ${
-        dark ? "bg-black" : "bg-white"
-      }`}
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden ${bgClass}`}
     >
-      {/* Content */}
-      <div className="relative flex flex-col items-center gap-6 px-6">
-        {/* Boxes row */}
-        <div className="flex items-end gap-3">
-          <Box delay={0.00} dark={dark} />
-          <Box delay={0.12} dark={dark} />
-          <Box delay={0.24} dark={dark} />
-          <Box delay={0.36} dark={dark} />
-        </div>
+      {/* 1. ATMOSPHERIC GLOW BACKGROUND */}
+      <motion.div
+        className={`absolute h-[400px] w-[400px] rounded-full blur-[100px] ${glowColor}`}
+        animate={{
+          scale: [1, 1.2, 1],
+          opacity: [0.3, 0.6, 0.3],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
 
-        {/* Underline bar reacts to the bounce */}
+      {/* 2. THE MAIN LOADER (The Core) */}
+      <div className="relative z-10 flex flex-col items-center gap-12">
+        
+        {/* Container der sich dreht */}
         <motion.div
-          className={`h-1 w-28 rounded-full ${
-            dark ? "bg-white/30" : "bg-gray-900/20"
-          }`}
-          initial={{ scaleX: 0.7, opacity: 0.8 }}
-          animate={{ scaleX: [0.7, 1, 0.7], opacity: [0.8, 1, 0.8] }}
-          transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-        />
-
-        {/* Label */}
-        <motion.p
-          className={`text-center text-sm tracking-wide ${
-            dark ? "text-white/80" : "text-gray-700"
-          }`}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="grid h-16 w-16 grid-cols-2 grid-rows-2 gap-2"
+          variants={containerVariants}
+          animate="animate"
         >
-          {label}
-        </motion.p>
+          {/* Die 4 tanzenden Elemente */}
+          {[0, 1, 2, 3].map((i) => (
+            <motion.div
+              key={i}
+              className={`h-full w-full rounded-lg shadow-2xl ${boxColor}`}
+              // Jedes Element atmet leicht versetzt für organischen Look
+              animate={{
+                scale: [1, 0.5, 1],
+                borderRadius: ["30%", "50%", "30%"],
+                x: i % 2 === 0 ? [0, -4, 0] : [0, 4, 0], // Leichtes Auseinanderdriften X
+                y: i < 2 ? [0, -4, 0] : [0, 4, 0],       // Leichtes Auseinanderdriften Y
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: i * 0.1, // Versatz
+              }}
+              style={{
+                backdropFilter: "blur(10px)",
+              }}
+            />
+          ))}
+        </motion.div>
+
+        {/* 3. SHIMMERING TEXT LABEL */}
+        <div className="relative overflow-hidden">
+          <p className={`text-sm font-medium tracking-[0.2em] uppercase ${textClass}`}>
+            {label}
+          </p>
+          
+          {/* Lichtreflexion über dem Text */}
+          <motion.div
+            className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/50 to-transparent"
+            animate={{
+              translateX: ["-100%", "200%"],
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+              repeatDelay: 0.5,
+            }}
+          />
+        </div>
       </div>
 
-      {/* Soft vignette */}
-      <div
-        className={`pointer-events-none absolute inset-0 ${
-          dark ? "bg-[radial-gradient(transparent,rgba(0,0,0,0.5))]" : "bg-[radial-gradient(transparent,rgba(0,0,0,0.05))]"
-        }`}
+      {/* 4. SUBTLE NOISE OVERLAY (Optional für Texture) */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
       />
     </div>
   );

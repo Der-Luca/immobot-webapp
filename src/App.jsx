@@ -23,7 +23,8 @@ import AdminRoute from "./routes/AdminRoute";
 
 import Dashboard from "./pages/user/Dashboard";
 import AdminDashboard from "./pages/admin/AdminDashbaord";
-
+import UserFiltersPage from "./pages/user/UserFiltersPage";
+import UserResultsPage from "./pages/user/results/UserResultsPage";
 import RootRedirect from "./RootRedirect";
 import UserProfile from "./pages/user/UserProfile";
 
@@ -60,6 +61,8 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+<Route path="/dashboard/filters" element={<UserFiltersPage />} />
+<Route path="/dashboard/results" element={<UserResultsPage />} />
          <Route path="/dashboard/profile" element={<UserProfile />} />
       </Route>
 
