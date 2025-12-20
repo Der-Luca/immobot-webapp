@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 
@@ -29,27 +29,55 @@ export default function AdvancedFiltersCard({ filters, user }) {
   const [energySources, setES] = useState(filters.energySources || []);
   const [heatingTypes, setHT] = useState(filters.heatingTypes || []);
   const [energyRatings, setER] = useState(filters.energyRatings || []);
-  const [effStandards, setEff] = useState(filters.energyEfficiencyStandards || []);
+  const [effStandards, setEff] = useState(
+    filters.energyEfficiencyStandards || []
+  );
 
   /* Ranges */
   const [pqmFrom, setPqmFrom] = useState(filters.pricePerSqmRange?.from ?? "");
   const [pqmTo, setPqmTo] = useState(filters.pricePerSqmRange?.to ?? "");
   const [yieldF, setYieldF] = useState(filters.yieldRange?.from ?? "");
   const [yieldT, setYieldT] = useState(filters.yieldRange?.to ?? "");
-  const [ecFrom, setEcFrom] = useState(filters.energyConsumptionRange?.from ?? "");
-  const [ecTo, setEcTo] = useState(filters.energyConsumptionRange?.to ?? "");
-  const [byFrom, setByFrom] = useState(filters.constructionYearRange?.from ?? "");
-  const [byTo, setByTo] = useState(filters.constructionYearRange?.to ?? "");
+  const [ecFrom, setEcFrom] = useState(
+    filters.energyConsumptionRange?.from ?? ""
+  );
+  const [ecTo, setEcTo] = useState(
+    filters.energyConsumptionRange?.to ?? ""
+  );
+  const [byFrom, setByFrom] = useState(
+    filters.constructionYearRange?.from ?? ""
+  );
+  const [byTo, setByTo] = useState(
+    filters.constructionYearRange?.to ?? ""
+  );
+
+  // 🔥 WICHTIG: State sync bei async geladenen filters
+  useEffect(() => {
+    setES(filters.energySources || []);
+    setHT(filters.heatingTypes || []);
+    setER(filters.energyRatings || []);
+    setEff(filters.energyEfficiencyStandards || []);
+
+    setPqmFrom(filters.pricePerSqmRange?.from ?? "");
+    setPqmTo(filters.pricePerSqmRange?.to ?? "");
+    setYieldF(filters.yieldRange?.from ?? "");
+    setYieldT(filters.yieldRange?.to ?? "");
+    setEcFrom(filters.energyConsumptionRange?.from ?? "");
+    setEcTo(filters.energyConsumptionRange?.to ?? "");
+    setByFrom(filters.constructionYearRange?.from ?? "");
+    setByTo(filters.constructionYearRange?.to ?? "");
+  }, [filters]);
 
   const toggle = (value, arr, setArr) => {
     setArr(arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
   };
 
   async function save() {
-    const ref = doc(db, "users", user.uid, "searchFilters", "default");
+    // ✅ NUR users/{uid}.lastSearch
+    const ref = doc(db, "users", user.uid);
 
     await updateDoc(ref, {
-      filters: {
+      lastSearch: {
         ...filters,
         energySources,
         heatingTypes,
@@ -59,7 +87,7 @@ export default function AdvancedFiltersCard({ filters, user }) {
         yieldRange: { from: yieldF, to: yieldT },
         energyConsumptionRange: { from: ecFrom, to: ecTo },
         constructionYearRange: { from: byFrom, to: byTo },
-      }
+      },
     });
 
     setEdit(false);
@@ -76,9 +104,10 @@ export default function AdvancedFiltersCard({ filters, user }) {
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-
       <header className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Erweiterte Filter</h2>
+        <h2 className="text-lg font-semibold text-gray-900">
+          Erweiterte Filter
+        </h2>
         <button
           onClick={() => setEdit(!edit)}
           className="text-sm px-4 py-1.5 rounded-full border border-gray-300 hover:bg-gray-100"
@@ -87,7 +116,6 @@ export default function AdvancedFiltersCard({ filters, user }) {
         </button>
       </header>
 
-      {/* -------------------------- VIEW MODE --------------------------- */}
       {!edit ? (
         <div className="text-gray-800 text-sm space-y-2 leading-relaxed">
           <p><strong>Energieträger:</strong> {energySources.join(", ") || "—"}</p>
@@ -101,39 +129,77 @@ export default function AdvancedFiltersCard({ filters, user }) {
           <p><strong>Baujahr:</strong> {fmtRange(byFrom, byTo)}</p>
         </div>
       ) : (
-        /* --------------------------- EDIT MODE --------------------------- */
         <div className="space-y-6">
-
           <Section title="Energieträger">
-            <ChipGrid options={ENERGY_SOURCES} active={energySources} onToggle={(v) => toggle(v, energySources, setES)} />
+            <ChipGrid
+              options={ENERGY_SOURCES}
+              active={energySources}
+              onToggle={(v) => toggle(v, energySources, setES)}
+            />
           </Section>
 
           <Section title="Heizung">
-            <ChipGrid options={HEATING_TYPES} active={heatingTypes} onToggle={(v) => toggle(v, heatingTypes, setHT)} />
+            <ChipGrid
+              options={HEATING_TYPES}
+              active={heatingTypes}
+              onToggle={(v) => toggle(v, heatingTypes, setHT)}
+            />
           </Section>
 
           <Section title="Energieklasse">
-            <ChipGrid options={ENERGY_RATINGS} active={energyRatings} onToggle={(v) => toggle(v, energyRatings, setER)} />
+            <ChipGrid
+              options={ENERGY_RATINGS}
+              active={energyRatings}
+              onToggle={(v) => toggle(v, energyRatings, setER)}
+            />
           </Section>
 
           <Section title="Energiestandard">
-            <ChipGrid options={EFFICIENCY_STANDARDS} active={effStandards} onToggle={(v) => toggle(v, effStandards, setEff)} />
+            <ChipGrid
+              options={EFFICIENCY_STANDARDS}
+              active={effStandards}
+              onToggle={(v) => toggle(v, effStandards, setEff)}
+            />
           </Section>
 
           <Section title="Preis pro m²">
-            <RangeRow from={pqmFrom} to={pqmTo} setFrom={setPqmFrom} setTo={setPqmTo} unit="€/m²" />
+            <RangeRow
+              from={pqmFrom}
+              to={pqmTo}
+              setFrom={setPqmFrom}
+              setTo={setPqmTo}
+              unit="€/m²"
+            />
           </Section>
 
           <Section title="Rendite">
-            <RangeRow from={yieldF} to={yieldT} setFrom={setYieldF} setTo={setYieldT} unit="%" step="0.1" />
+            <RangeRow
+              from={yieldF}
+              to={yieldT}
+              setFrom={setYieldF}
+              setTo={setYieldT}
+              unit="%"
+              step="0.1"
+            />
           </Section>
 
           <Section title="Energieverbrauch">
-            <RangeRow from={ecFrom} to={ecTo} setFrom={setEcFrom} setTo={setEcTo} unit="kWh/m²*a" />
+            <RangeRow
+              from={ecFrom}
+              to={ecTo}
+              setFrom={setEcFrom}
+              setTo={setEcTo}
+              unit="kWh/m²*a"
+            />
           </Section>
 
           <Section title="Baujahr">
-            <RangeRow from={byFrom} to={byTo} setFrom={setByFrom} setTo={setByTo} />
+            <RangeRow
+              from={byFrom}
+              to={byTo}
+              setFrom={setByFrom}
+              setTo={setByTo}
+            />
           </Section>
         </div>
       )}

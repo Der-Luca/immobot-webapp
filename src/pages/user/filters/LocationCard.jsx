@@ -13,12 +13,24 @@ export default function LocationCard({ filters }) {
   const [address, setAddress] = useState("");
   const [suggestions, setSuggestions] = useState([]);
 
-  const [lat, setLat] = useState(filters.coordinate?.lat ?? 52.52);
-  const [lon, setLon] = useState(filters.coordinate?.lon ?? 13.405);
-  const [radius, setRadius] = useState(filters.radiusInKm ?? 10);
+  // 👉 Initialwerte (nur für den ersten Render)
+  const [lat, setLat] = useState(filters?.coordinate?.lat ?? 52.52);
+  const [lon, setLon] = useState(filters?.coordinate?.lon ?? 13.405);
+  const [radius, setRadius] = useState(filters?.radiusInKm ?? 10);
 
   const mapRef = useRef(null);
   const leafletRef = useRef({ L: null, map: null, marker: null, circle: null });
+
+  /* ---------------------------------------------------------- */
+  /* 🔥 WICHTIG: State synchron halten, wenn filters async kommt */
+  /* ---------------------------------------------------------- */
+  useEffect(() => {
+    if (!filters) return;
+
+    if (filters.coordinate?.lat != null) setLat(filters.coordinate.lat);
+    if (filters.coordinate?.lon != null) setLon(filters.coordinate.lon);
+    if (filters.radiusInKm != null) setRadius(filters.radiusInKm);
+  }, [filters]);
 
   /* ---------------------------------------------------------- */
   /* AUTOCOMPLETE – Adresse suchen                               */
@@ -68,6 +80,7 @@ export default function LocationCard({ filters }) {
         link.setAttribute("data-leaflet", "1");
         document.head.appendChild(link);
       }
+
       if (!window.L) {
         await new Promise((resolve) => {
           const s = document.createElement("script");
@@ -76,13 +89,16 @@ export default function LocationCard({ filters }) {
           document.body.appendChild(s);
         });
       }
+
       return window.L;
     }
 
     async function init() {
       if (!mapRef.current) return;
+
       const L = await ensureLeaflet();
       if (cancelled) return;
+
       leafletRef.current.L = L;
 
       if (!leafletRef.current.map) {
@@ -126,23 +142,26 @@ export default function LocationCard({ filters }) {
   }, [lat, lon, radius]);
 
   /* ---------------------------------------------------------- */
-  /* FIRESTORE SPEICHERN                                        */
+  /* FIRESTORE SPEICHERN – lastSearch                            */
   /* ---------------------------------------------------------- */
 
   async function save() {
     if (!user?.uid) return;
+
     try {
-      const ref = doc(db, "users", user.uid, "searchFilters", "default");
+      const ref = doc(db, "users", user.uid);
+
       await updateDoc(ref, {
-        filters: {
-          ...filters,
+        lastSearch: {
+          ...(filters || {}),
           coordinate: { lat, lon },
           radiusInKm: radius,
         },
       });
+
       setEditMode(false);
     } catch (err) {
-      console.error(err);
+      console.error("LocationCard save failed", err);
     }
   }
 
@@ -151,7 +170,9 @@ export default function LocationCard({ filters }) {
   return (
     <section className="mb-6 rounded-2xl border border-gray-200 bg-slate-50 p-5">
       <header className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Standort & Radius</h2>
+        <h2 className="text-lg font-semibold text-gray-900">
+          Standort & Radius
+        </h2>
         <button
           onClick={() => setEditMode((v) => !v)}
           className="rounded-full border border-gray-900 px-3 py-1 text-xs font-medium"
@@ -177,7 +198,6 @@ export default function LocationCard({ filters }) {
             className="w-full rounded-xl border px-3 py-2 text-sm"
           />
 
-          {/* Vorschläge */}
           {suggestions.length > 0 && (
             <div className="absolute left-0 right-0 mt-1 rounded-xl border bg-white shadow z-10 max-h-40 overflow-auto">
               {suggestions.map((s, i) => (
@@ -217,10 +237,7 @@ export default function LocationCard({ filters }) {
       )}
 
       {/* MAP */}
-      <div
-        ref={mapRef}
-        className="h-72 w-full rounded-xl border bg-gray-200"
-      />
+      <div ref={mapRef} className="h-72 w-full rounded-xl border bg-gray-200" />
 
       {/* Speichern */}
       {editMode && (

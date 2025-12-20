@@ -1,5 +1,5 @@
 // src/pages/public/user/filters/ExtrasCard.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -26,19 +26,26 @@ const AMENITIES = [
   { key: "airConditioningVentilation", label: "Klima / Belüftung" },
 ];
 
+function buildAmenFromFilters(filters) {
+  return AMENITIES.reduce(
+    (acc, a) => ({
+      ...acc,
+      [a.key]: filters?.[a.key] ?? false,
+    }),
+    {}
+  );
+}
+
 export default function ExtrasCard({ filters }) {
   const { user } = useAuth();
 
   // lokale States laden
-  const [amen, setAmen] = useState({
-    ...AMENITIES.reduce(
-      (acc, a) => ({
-        ...acc,
-        [a.key]: filters[a.key] ?? false,
-      }),
-      {}
-    ),
-  });
+  const [amen, setAmen] = useState(() => buildAmenFromFilters(filters));
+
+  // 🔥 wichtig: sync wenn filters async nachgeladen werden
+  useEffect(() => {
+    setAmen(buildAmenFromFilters(filters));
+  }, [filters]);
 
   // togglen + speichern
   const toggle = async (key) => {
@@ -46,15 +53,12 @@ export default function ExtrasCard({ filters }) {
     const newAmen = { ...amen, [key]: newVal };
     setAmen(newAmen);
 
-    await updateDoc(
-      doc(db, "users", user.uid, "searchFilters", "default"),
-      {
-        filters: {
-          ...filters,
-          ...newAmen,
-        },
-      }
-    );
+    await updateDoc(doc(db, "users", user.uid), {
+      lastSearch: {
+        ...filters,
+        ...newAmen,
+      },
+    });
   };
 
   return (

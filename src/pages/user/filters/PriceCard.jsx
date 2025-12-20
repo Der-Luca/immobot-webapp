@@ -34,7 +34,15 @@ export default function PriceCard({ filters }) {
   );
 
   const [priceTo, setPriceTo] = useState(filters.priceRange?.to ?? null);
-  const [spaceTo, setSpaceTo] = useState(filters.propertySpaceRange?.to ?? null);
+  const [spaceTo, setSpaceTo] = useState(
+    filters.propertySpaceRange?.to ?? null
+  );
+
+  // 🔥 wichtig: sync bei async geladenen filters
+  useEffect(() => {
+    setPriceTo(filters.priceRange?.to ?? null);
+    setSpaceTo(filters.propertySpaceRange?.to ?? null);
+  }, [filters]);
 
   const title = isRentOnly
     ? "Was ist dein persönlicher Höchstpreis (Miete)?"
@@ -46,9 +54,8 @@ export default function PriceCard({ filters }) {
   const fmtQM = (n) =>
     typeof n === "number" ? `bis ${n} qm` : "beliebig";
 
-  const ref =
-    user?.uid &&
-    doc(db, "users", user.uid, "searchFilters", "default");
+  // ✅ NUR NOCH users/{uid}
+  const ref = user?.uid && doc(db, "users", user.uid);
 
   async function saveFilters(next) {
     if (!ref) return;
@@ -56,7 +63,7 @@ export default function PriceCard({ filters }) {
     await setDoc(
       ref,
       {
-        filters: next,
+        lastSearch: next,
       },
       { merge: true }
     );
@@ -84,6 +91,7 @@ export default function PriceCard({ filters }) {
     });
   };
 
+  // gleiches Verhalten wie vorher bei Wechsel Kauf/Miete
   useEffect(() => {
     if (!ref) return;
 

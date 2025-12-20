@@ -12,28 +12,34 @@ export default function useUserFilters() {
     if (!user?.uid) return;
 
     async function load() {
+      setLoading(true);
+
       try {
-        const ref = doc(db, "users", user.uid, "searchFilters", "default");
+        const ref = doc(db, "users", user.uid);
         const snap = await getDoc(ref);
 
-        // 👉 Default-Dokument automatisch anlegen
-        if (!snap.exists()) {
-          const initial = {
-            filters: {
-              offerTypes: [],
-              priceRange: {},
-              propertySpaceRange: {},
-            },
-            createdAt: new Date(),
+        const data = snap.exists() ? snap.data() : {};
+        const lastSearch = data?.lastSearch ?? null;
+
+        // 👉 Default anlegen, aber NUR in users/{uid}.lastSearch
+        if (!lastSearch) {
+          const initialLastSearch = {
+            offerTypes: [],
+            priceRange: {},
+            propertySpaceRange: {},
           };
 
-          await setDoc(ref, initial);
-          setFilters(initial.filters);
+          await setDoc(
+            ref,
+            { lastSearch: initialLastSearch },
+            { merge: true }
+          );
+
+          setFilters(initialLastSearch);
           return;
         }
 
-        const data = snap.data();
-        setFilters(data.filters || {});
+        setFilters(lastSearch);
       } catch (err) {
         console.error("Fehler beim Laden der Filters:", err);
         setFilters({});
