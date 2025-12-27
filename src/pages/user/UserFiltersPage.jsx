@@ -34,13 +34,12 @@ export default function UserFiltersPage() {
         {/* ✅ KEIN auto-rows-fr mehr (war zu hoch) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Zeile 1 */}
+           <div className="h-full">
+            <LocationCard filters={filters} onChange={updateFilters} />
+          </div>
           <div className="h-full">
             <ObjectCard filters={filters} onChange={updateFilters} />
           </div>
-          <div className="h-full">
-            <LocationCard filters={filters} onChange={updateFilters} />
-          </div>
-
           {/* Zeile 2 */}
           <div className="h-full">
             <PriceCard filters={filters} onChange={updateFilters} />
