@@ -1,20 +1,40 @@
-import { useEffect, useState } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
+import { useState } from "react";
+import FilterFrame from "./FilterFrame";
 
+/* ------------------- Constants ------------------- */
 const ENERGY_SOURCES = [
-  "Erdgas","Erdwaerme","Fernwaerme","Fluessiggas","Gas","Holz","Kohle",
-  "Luftwaerme","Nahwaerme","Oel","Pellets","Solar","Strom","Wasserwaerme","Alternativ"
+  { value: "Erdgas", label: "Erdgas" },
+  { value: "Erdwaerme", label: "Erdwärme" },
+  { value: "Fernwaerme", label: "Fernwärme" },
+  { value: "Fluessiggas", label: "Flüssiggas" },
+  { value: "Gas", label: "Gas" },
+  { value: "Holz", label: "Holz" },
+  { value: "Kohle", label: "Kohle" },
+  { value: "Luftwaerme", label: "Luftwärme" },
+  { value: "Nahwaerme", label: "Nahwärme" },
+  { value: "Oel", label: "Öl" },
+  { value: "Pellets", label: "Pellets" },
+  { value: "Solar", label: "Solar" },
+  { value: "Strom", label: "Strom" },
+  { value: "Wasserwaerme", label: "Wasserwärme" },
+  { value: "Alternativ", label: "Alternativ" },
 ];
 
 const HEATING_TYPES = [
-  "Blockheizkraftwerk","Etagenheizung","Fernheizung","Fussbodenheizung",
-  "Kachelofen","Kamin","Nachtspeicher","Ofenheizung","Solarheizung",
-  "Waermepumpe","Zentralheizung"
+  { value: "Blockheizkraftwerk", label: "Blockheizkraftwerk" },
+  { value: "Etagenheizung", label: "Etagenheizung" },
+  { value: "Fernheizung", label: "Fernheizung" },
+  { value: "Fussbodenheizung", label: "Fußbodenheizung" },
+  { value: "Kachelofen", label: "Kachelofen" },
+  { value: "Kamin", label: "Kamin" },
+  { value: "Nachtspeicher", label: "Nachtspeicher" },
+  { value: "Ofenheizung", label: "Ofenheizung" },
+  { value: "Solarheizung", label: "Solarheizung" },
+  { value: "Waermepumpe", label: "Wärmepumpe" },
+  { value: "Zentralheizung", label: "Zentralheizung" },
 ];
 
 const ENERGY_RATINGS = ["A3Plus","A2Plus","APlus","A","B","C","D","E","F","G","H"];
-
 const EFFICIENCY_STANDARDS = [
   "KfwEffizienzhausDenkmal","KfwEffizienzhaus115","KfwEffizienzhaus100",
   "KfwEffizienzhaus85","KfwEffizienzhaus70","KfwEffizienzhaus60",
@@ -22,231 +42,47 @@ const EFFICIENCY_STANDARDS = [
   "Passivhaus","Nullenergiehaus","Plusenergiehaus"
 ];
 
-export default function AdvancedFiltersCard({ filters, user }) {
-  const [edit, setEdit] = useState(false);
-
-  /* Arrays */
-  const [energySources, setES] = useState(filters.energySources || []);
-  const [heatingTypes, setHT] = useState(filters.heatingTypes || []);
-  const [energyRatings, setER] = useState(filters.energyRatings || []);
-  const [effStandards, setEff] = useState(
-    filters.energyEfficiencyStandards || []
-  );
-
-  /* Ranges */
-  const [pqmFrom, setPqmFrom] = useState(filters.pricePerSqmRange?.from ?? "");
-  const [pqmTo, setPqmTo] = useState(filters.pricePerSqmRange?.to ?? "");
-  const [yieldF, setYieldF] = useState(filters.yieldRange?.from ?? "");
-  const [yieldT, setYieldT] = useState(filters.yieldRange?.to ?? "");
-  const [ecFrom, setEcFrom] = useState(
-    filters.energyConsumptionRange?.from ?? ""
-  );
-  const [ecTo, setEcTo] = useState(
-    filters.energyConsumptionRange?.to ?? ""
-  );
-  const [byFrom, setByFrom] = useState(
-    filters.constructionYearRange?.from ?? ""
-  );
-  const [byTo, setByTo] = useState(
-    filters.constructionYearRange?.to ?? ""
-  );
-
-  // 🔥 WICHTIG: State sync bei async geladenen filters
-  useEffect(() => {
-    setES(filters.energySources || []);
-    setHT(filters.heatingTypes || []);
-    setER(filters.energyRatings || []);
-    setEff(filters.energyEfficiencyStandards || []);
-
-    setPqmFrom(filters.pricePerSqmRange?.from ?? "");
-    setPqmTo(filters.pricePerSqmRange?.to ?? "");
-    setYieldF(filters.yieldRange?.from ?? "");
-    setYieldT(filters.yieldRange?.to ?? "");
-    setEcFrom(filters.energyConsumptionRange?.from ?? "");
-    setEcTo(filters.energyConsumptionRange?.to ?? "");
-    setByFrom(filters.constructionYearRange?.from ?? "");
-    setByTo(filters.constructionYearRange?.to ?? "");
-  }, [filters]);
-
-  const toggle = (value, arr, setArr) => {
-    setArr(arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
-  };
-
-  async function save() {
-    // ✅ NUR users/{uid}.lastSearch
-    const ref = doc(db, "users", user.uid);
-
-    await updateDoc(ref, {
-      lastSearch: {
-        ...filters,
-        energySources,
-        heatingTypes,
-        energyRatings,
-        energyEfficiencyStandards: effStandards,
-        pricePerSqmRange: { from: pqmFrom, to: pqmTo },
-        yieldRange: { from: yieldF, to: yieldT },
-        energyConsumptionRange: { from: ecFrom, to: ecTo },
-        constructionYearRange: { from: byFrom, to: byTo },
-      },
-    });
-
-    setEdit(false);
-  }
-
-  /* ---------------------- FORMATTER ----------------------- */
-
-  const fmtRange = (from, to, unit = "") => {
-    if (from && to) return `von ${from}${unit} bis ${to}${unit}`;
-    if (from) return `ab ${from}${unit}`;
-    if (to) return `bis ${to}${unit}`;
-    return "—";
-  };
-
-  return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <header className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Erweiterte Filter
-        </h2>
-        <button
-          onClick={() => setEdit(!edit)}
-          className="text-sm px-4 py-1.5 rounded-full border border-gray-300 hover:bg-gray-100"
-        >
-          {edit ? "Fertig" : "Bearbeiten"}
-        </button>
-      </header>
-
-      {!edit ? (
-        <div className="text-gray-800 text-sm space-y-2 leading-relaxed">
-          <p><strong>Energieträger:</strong> {energySources.join(", ") || "—"}</p>
-          <p><strong>Heizung:</strong> {heatingTypes.join(", ") || "—"}</p>
-          <p><strong>Energieklasse:</strong> {energyRatings.join(", ") || "—"}</p>
-          <p><strong>KfW-Standard:</strong> {effStandards.join(", ") || "—"}</p>
-
-          <p><strong>Preis pro m²:</strong> {fmtRange(pqmFrom, pqmTo, " €/m²")}</p>
-          <p><strong>Rendite:</strong> {fmtRange(yieldF, yieldT, "%")}</p>
-          <p><strong>Energieverbrauch:</strong> {fmtRange(ecFrom, ecTo, " kWh/m²*a")}</p>
-          <p><strong>Baujahr:</strong> {fmtRange(byFrom, byTo)}</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <Section title="Energieträger">
-            <ChipGrid
-              options={ENERGY_SOURCES}
-              active={energySources}
-              onToggle={(v) => toggle(v, energySources, setES)}
-            />
-          </Section>
-
-          <Section title="Heizung">
-            <ChipGrid
-              options={HEATING_TYPES}
-              active={heatingTypes}
-              onToggle={(v) => toggle(v, heatingTypes, setHT)}
-            />
-          </Section>
-
-          <Section title="Energieklasse">
-            <ChipGrid
-              options={ENERGY_RATINGS}
-              active={energyRatings}
-              onToggle={(v) => toggle(v, energyRatings, setER)}
-            />
-          </Section>
-
-          <Section title="Energiestandard">
-            <ChipGrid
-              options={EFFICIENCY_STANDARDS}
-              active={effStandards}
-              onToggle={(v) => toggle(v, effStandards, setEff)}
-            />
-          </Section>
-
-          <Section title="Preis pro m²">
-            <RangeRow
-              from={pqmFrom}
-              to={pqmTo}
-              setFrom={setPqmFrom}
-              setTo={setPqmTo}
-              unit="€/m²"
-            />
-          </Section>
-
-          <Section title="Rendite">
-            <RangeRow
-              from={yieldF}
-              to={yieldT}
-              setFrom={setYieldF}
-              setTo={setYieldT}
-              unit="%"
-              step="0.1"
-            />
-          </Section>
-
-          <Section title="Energieverbrauch">
-            <RangeRow
-              from={ecFrom}
-              to={ecTo}
-              setFrom={setEcFrom}
-              setTo={setEcTo}
-              unit="kWh/m²*a"
-            />
-          </Section>
-
-          <Section title="Baujahr">
-            <RangeRow
-              from={byFrom}
-              to={byTo}
-              setFrom={setByFrom}
-              setTo={setByTo}
-            />
-          </Section>
-        </div>
-      )}
-
-      {edit && (
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={save}
-            className="px-4 py-2 rounded-full bg-blue-600 text-white text-xs hover:bg-blue-700"
-          >
-            Speichern
-          </button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-/* ----------------------------------------------------------- */
-/* Helper UI Components */
-/* ----------------------------------------------------------- */
+/* ------------------- Helpers ------------------- */
 
 function Section({ title, children }) {
   return (
     <div>
-      <h3 className="font-semibold text-sm mb-2">{title}</h3>
+      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+        {title}
+      </h3>
       {children}
     </div>
   );
 }
 
-function ChipGrid({ options, active, onToggle }) {
+function ChipGrid({ options, active = [], onToggle, isEditing }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => {
-        const isActive = active.includes(opt);
+        const val = typeof opt === "string" ? opt : opt.value;
+        const label = typeof opt === "string" ? opt : opt.label;
+        const isActive = active.includes(val);
+
+        const base =
+          "px-3 py-1.5 text-xs font-medium rounded-full border transition-all";
+
+        const cls = isActive
+          ? isEditing
+            ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
+            : `${base} bg-gray-200 border-gray-200 text-gray-700`
+          : isEditing
+            ? `${base} bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400`
+            : `${base} bg-white border-gray-200 text-gray-400`;
+
         return (
           <button
-            key={opt}
-            onClick={() => onToggle(opt)}
-            className={`px-3 py-1.5 text-xs rounded-full border transition ${
-              isActive
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
-            }`}
+            key={val}
+            type="button"
+            disabled={!isEditing}
+            onClick={() => onToggle(val)}
+            className={cls}
           >
-            {opt}
+            {label}
           </button>
         );
       })}
@@ -254,26 +90,232 @@ function ChipGrid({ options, active, onToggle }) {
   );
 }
 
-function RangeRow({ from, to, setFrom, setTo, unit, step = "1" }) {
+function RangeInput({ from, to, unit, onChangeFrom, onChangeTo, isEditing }) {
   return (
-    <div className="flex flex-col gap-2 max-w-xs">
+    <div className="flex items-center gap-2 max-w-xs">
       <input
         type="number"
-        step={step}
-        value={from}
-        onChange={(e) => setFrom(e.target.value)}
-        className="rounded-lg border px-3 py-2"
+        value={from ?? ""}
+        disabled={!isEditing}
+        onChange={(e) => onChangeFrom(e.target.value)}
+        className="w-24 rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm disabled:text-gray-400"
         placeholder="von"
       />
+      <span className="text-gray-400">-</span>
       <input
         type="number"
-        step={step}
-        value={to}
-        onChange={(e) => setTo(e.target.value)}
-        className="rounded-lg border px-3 py-2"
+        value={to ?? ""}
+        disabled={!isEditing}
+        onChange={(e) => onChangeTo(e.target.value)}
+        className="w-24 rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm disabled:text-gray-400"
         placeholder="bis"
       />
-      {unit && <span className="text-xs text-gray-500">{unit}</span>}
+      <span className="text-sm text-gray-500 font-medium ml-1">{unit}</span>
     </div>
+  );
+}
+
+const toNumberOrNull = (v) =>
+  v === "" || v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null;
+
+/* ------------------- Main ------------------- */
+
+export default function AdvancedFiltersCard({ filters, onChange }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const enterEdit = () => setIsEditing(true);
+
+  const toggleArray = (field, value) => {
+    if (!isEditing) return;
+    const current = filters[field] || [];
+    const next = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+
+    onChange({ ...filters, [field]: next });
+  };
+
+  const updateRange = (field, key, value) => {
+    onChange({
+      ...filters,
+      [field]: {
+        ...(filters[field] || {}),
+        [key]: toNumberOrNull(value),
+      },
+    });
+  };
+
+  const {
+    energySources = [],
+    heatingTypes = [],
+    energyRatings = [],
+    energyEfficiencyStandards = [],
+    pricePerSqmRange = {},
+    yieldRange = {},
+    energyConsumptionRange = {},
+    constructionYearRange = {},
+  } = filters || {};
+
+  return (
+    <FilterFrame
+      isEditing={isEditing}
+      header={
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
+              Erweiterte Filter
+            </h2>
+
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={enterEdit}
+                className="
+                  inline-flex items-center
+                  mt-2
+                  px-3 py-1.5
+                  text-sm font-semibold
+                  rounded-full
+                  bg-gray-200 text-gray-800
+                  hover:bg-gray-300
+                  transition
+                "
+              >
+                Bearbeiten
+              </button>
+            )}
+          </div>
+
+          {isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="
+                px-5 py-2
+                text-sm font-semibold
+                rounded-xl
+                bg-blue-600 text-white
+                hover:bg-blue-700
+                transition
+              "
+            >
+              Fertig
+            </button>
+          )}
+        </div>
+      }
+    >
+      {/* Body */}
+      <div className="relative space-y-8">
+        <Section title="Energieträger">
+          <ChipGrid
+            options={ENERGY_SOURCES}
+            active={energySources}
+            isEditing={isEditing}
+            onToggle={(v) => toggleArray("energySources", v)}
+          />
+        </Section>
+
+        <Section title="Heizung">
+          <ChipGrid
+            options={HEATING_TYPES}
+            active={heatingTypes}
+            isEditing={isEditing}
+            onToggle={(v) => toggleArray("heatingTypes", v)}
+          />
+        </Section>
+
+        <Section title="Energieklasse">
+          <ChipGrid
+            options={ENERGY_RATINGS}
+            active={energyRatings}
+            isEditing={isEditing}
+            onToggle={(v) => toggleArray("energyRatings", v)}
+          />
+        </Section>
+
+        <Section title="Energiestandard">
+          <ChipGrid
+            options={EFFICIENCY_STANDARDS}
+            active={energyEfficiencyStandards}
+            isEditing={isEditing}
+            onToggle={(v) => toggleArray("energyEfficiencyStandards", v)}
+          />
+        </Section>
+
+        <hr className="border-gray-200/60" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <Section title="Preis pro m²">
+            <RangeInput
+              from={pricePerSqmRange.from}
+              to={pricePerSqmRange.to}
+              unit="€/m²"
+              isEditing={isEditing}
+              onChangeFrom={(v) =>
+                updateRange("pricePerSqmRange", "from", v)
+              }
+              onChangeTo={(v) =>
+                updateRange("pricePerSqmRange", "to", v)
+              }
+            />
+          </Section>
+
+          <Section title="Rendite">
+            <RangeInput
+              from={yieldRange.from}
+              to={yieldRange.to}
+              unit="%"
+              isEditing={isEditing}
+              onChangeFrom={(v) =>
+                updateRange("yieldRange", "from", v)
+              }
+              onChangeTo={(v) =>
+                updateRange("yieldRange", "to", v)
+              }
+            />
+          </Section>
+
+          <Section title="Energieverbrauch">
+            <RangeInput
+              from={energyConsumptionRange.from}
+              to={energyConsumptionRange.to}
+              unit="kWh"
+              isEditing={isEditing}
+              onChangeFrom={(v) =>
+                updateRange("energyConsumptionRange", "from", v)
+              }
+              onChangeTo={(v) =>
+                updateRange("energyConsumptionRange", "to", v)
+              }
+            />
+          </Section>
+
+          <Section title="Baujahr">
+            <RangeInput
+              from={constructionYearRange.from}
+              to={constructionYearRange.to}
+              unit=""
+              isEditing={isEditing}
+              onChangeFrom={(v) =>
+                updateRange("constructionYearRange", "from", v)
+              }
+              onChangeTo={(v) =>
+                updateRange("constructionYearRange", "to", v)
+              }
+            />
+          </Section>
+        </div>
+
+        {/* Click-anywhere Overlay */}
+        {!isEditing && (
+          <button
+            type="button"
+            onClick={enterEdit}
+            className="absolute inset-0 rounded-xl bg-transparent"
+            aria-label="Bearbeiten aktivieren"
+          />
+        )}
+      </div>
+    </FilterFrame>
   );
 }

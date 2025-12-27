@@ -1,12 +1,17 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 
 export default function useUserFilters() {
   const { user } = useAuth();
-  const [filters, setFilters] = useState({});
+
+  const [filters, setFilters] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const prevFiltersRef = useRef(null);
+
+  /* ---------------- LOAD ---------------- */
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -18,28 +23,22 @@ export default function useUserFilters() {
         const ref = doc(db, "users", user.uid);
         const snap = await getDoc(ref);
 
-        const data = snap.exists() ? snap.data() : {};
-        const lastSearch = data?.lastSearch ?? null;
+        let lastSearch = snap.exists() ? snap.data()?.lastSearch : null;
 
-        // 👉 Default anlegen, aber NUR in users/{uid}.lastSearch
         if (!lastSearch) {
-          const initialLastSearch = {
+          lastSearch = {
             offerTypes: [],
-            priceRange: {},
-            propertySpaceRange: {},
+            objectClasses: [],
+            priceRange: { to: null },
+            propertySpaceRange: { from: null, to: null },
           };
 
-          await setDoc(
-            ref,
-            { lastSearch: initialLastSearch },
-            { merge: true }
-          );
-
-          setFilters(initialLastSearch);
-          return;
+          await setDoc(ref, { lastSearch }, { merge: true });
         }
 
+        // ❗ NICHT normalisieren / NICHT reduzieren
         setFilters(lastSearch);
+        prevFiltersRef.current = lastSearch;
       } catch (err) {
         console.error("Fehler beim Laden der Filters:", err);
         setFilters({});
@@ -51,5 +50,59 @@ export default function useUserFilters() {
     load();
   }, [user?.uid]);
 
-  return { filters, loading };
+  /* ---------------- UPDATE ---------------- */
+
+  const updateFilters = useCallback(
+    async (patch) => {
+      if (!user?.uid) return;
+
+      const prev = prevFiltersRef.current || {};
+      let next = {
+        ...prev,
+        ...patch,
+      };
+
+      /* 🔁 Reset-Logiken */
+
+      // Miete ↔ Kauf
+      const prevOffer = prev.offerTypes?.[0] ?? null;
+      const nextOffer = next.offerTypes?.[0] ?? null;
+
+      if (prevOffer && nextOffer && prevOffer !== nextOffer) {
+        next = {
+          ...next,
+          priceRange: { ...(next.priceRange || {}), to: null },
+        };
+      }
+
+      // Wohnung ↔ Grundstück
+      const prevIsPlot = prev.objectClasses?.includes("Grundstueck") || false;
+      const nextIsPlot = next.objectClasses?.includes("Grundstueck") || false;
+
+      if (prevIsPlot !== nextIsPlot) {
+        next = {
+          ...next,
+          propertySpaceRange: { from: null, to: null },
+        };
+      }
+
+      // UI sofort
+      setFilters(next);
+      prevFiltersRef.current = next;
+
+      // 🔥 Firestore MERGE (nicht ersetzen!)
+      await setDoc(
+        doc(db, "users", user.uid),
+        { lastSearch: next },
+        { merge: true }
+      );
+    },
+    [user?.uid]
+  );
+
+  return {
+    filters,
+    updateFilters,
+    loading,
+  };
 }

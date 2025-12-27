@@ -1,10 +1,9 @@
-// src/pages/public/user/filters/ExtrasCard.jsx
 import { useEffect, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
+import FilterFrame from "./FilterFrame";
 
-// gleiche Ausstattung wie Step4
 const AMENITIES = [
   { key: "balconyTerrace", label: "Balkon / Terrasse" },
   { key: "garden", label: "Garten" },
@@ -39,52 +38,121 @@ function buildAmenFromFilters(filters) {
 export default function ExtrasCard({ filters }) {
   const { user } = useAuth();
 
-  // lokale States laden
+  const [isEditing, setIsEditing] = useState(false);
   const [amen, setAmen] = useState(() => buildAmenFromFilters(filters));
 
-  // 🔥 wichtig: sync wenn filters async nachgeladen werden
   useEffect(() => {
     setAmen(buildAmenFromFilters(filters));
   }, [filters]);
 
-  // togglen + speichern
-  const toggle = async (key) => {
-    const newVal = !amen[key];
-    const newAmen = { ...amen, [key]: newVal };
-    setAmen(newAmen);
+  const enterEdit = () => setIsEditing(true);
 
-    await updateDoc(doc(db, "users", user.uid), {
-      lastSearch: {
-        ...filters,
-        ...newAmen,
-      },
-    });
+  const toggle = async (key) => {
+    if (!isEditing) return;
+
+    const next = { ...amen, [key]: !amen[key] };
+    setAmen(next);
+
+    if (user?.uid) {
+      await updateDoc(doc(db, "users", user.uid), {
+        lastSearch: {
+          ...filters,
+          ...next,
+        },
+      });
+    }
+  };
+
+  const chipClass = (active) => {
+    const base =
+      "px-4 py-2 text-sm rounded-full border transition-all duration-200";
+
+    if (active) {
+      return isEditing
+        ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
+        : `${base} bg-gray-200 border-gray-200 text-gray-700`;
+    }
+
+    return isEditing
+      ? `${base} bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400`
+      : `${base} bg-white border-gray-200 text-gray-400`;
   };
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-gray-900 mb-3">
-        Ausstattung & Extras
-      </h2>
+    <FilterFrame
+      isEditing={isEditing}
+      header={
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
+              Ausstattung & Extras
+            </h2>
 
-      <div className="flex flex-wrap gap-2">
-        {AMENITIES.map((a) => {
-          const active = amen[a.key];
-          return (
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={enterEdit}
+                className="
+                  inline-flex items-center
+                  mt-2
+                  px-3 py-1.5
+                  text-sm font-semibold
+                  rounded-full
+                  bg-gray-200 text-gray-800
+                  hover:bg-gray-300
+                  transition
+                "
+              >
+                Bearbeiten
+              </button>
+            )}
+          </div>
+
+          {isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="
+                px-5 py-2
+                text-sm font-semibold
+                rounded-xl
+                bg-blue-600 text-white
+                hover:bg-blue-700
+                transition
+              "
+            >
+              Fertig
+            </button>
+          )}
+        </div>
+      }
+    >
+      {/* Body */}
+      <div className="relative">
+        <div className="flex flex-wrap gap-2.5">
+          {AMENITIES.map((a) => (
             <button
               key={a.key}
+              type="button"
+              disabled={!isEditing}
               onClick={() => toggle(a.key)}
-              className={`px-3 py-1.5 text-xs rounded-full border transition ${
-                active
-                  ? "bg-blue-600 border-blue-600 text-white"
-                  : "bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200"
-              }`}
+              className={chipClass(amen[a.key])}
             >
               {a.label}
             </button>
-          );
-        })}
+          ))}
+        </div>
+
+        {/* Click-anywhere Overlay im View-Mode */}
+        {!isEditing && (
+          <button
+            type="button"
+            onClick={enterEdit}
+            className="absolute inset-0 rounded-xl bg-transparent"
+            aria-label="Bearbeiten aktivieren"
+          />
+        )}
       </div>
-    </section>
+    </FilterFrame>
   );
 }

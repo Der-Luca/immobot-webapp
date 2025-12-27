@@ -2,39 +2,50 @@ import { useEffect, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
+import FilterFrame from "./FilterFrame";
 
-const MAPTILER_KEY = "VUVj9lGbHQAdYVsF04k8";
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+
+const RADIUS_OPTIONS = [5, 10, 15, 20, 30, 50];
 
 export default function LocationCard({ filters }) {
   const { user } = useAuth();
 
-  const [editMode, setEditMode] = useState(false);
-
+  const [isEditing, setIsEditing] = useState(false);
   const [address, setAddress] = useState("");
   const [suggestions, setSuggestions] = useState([]);
 
-  // 👉 Initialwerte (nur für den ersten Render)
   const [lat, setLat] = useState(filters?.coordinate?.lat ?? 52.52);
   const [lon, setLon] = useState(filters?.coordinate?.lon ?? 13.405);
   const [radius, setRadius] = useState(filters?.radiusInKm ?? 10);
 
   const mapRef = useRef(null);
-  const leafletRef = useRef({ L: null, map: null, marker: null, circle: null });
+  const leafletRef = useRef({ map: null, marker: null, circle: null });
 
-  /* ---------------------------------------------------------- */
-  /* 🔥 WICHTIG: State synchron halten, wenn filters async kommt */
-  /* ---------------------------------------------------------- */
+  /* ---------------- Sync ---------------- */
+
   useEffect(() => {
     if (!filters) return;
-
     if (filters.coordinate?.lat != null) setLat(filters.coordinate.lat);
     if (filters.coordinate?.lon != null) setLon(filters.coordinate.lon);
     if (filters.radiusInKm != null) setRadius(filters.radiusInKm);
   }, [filters]);
 
-  /* ---------------------------------------------------------- */
-  /* AUTOCOMPLETE – Adresse suchen                               */
-  /* ---------------------------------------------------------- */
+  const enterEdit = () => setIsEditing(true);
+  const finishEdit = async () => {
+    if (user?.uid) {
+      await updateDoc(doc(db, "users", user.uid), {
+        lastSearch: {
+          ...(filters || {}),
+          coordinate: { lat, lon },
+          radiusInKm: radius,
+        },
+      });
+    }
+    setIsEditing(false);
+  };
+
+  /* ---------------- Autocomplete ---------------- */
 
   async function searchAddress(q) {
     if (!q || q.length < 3) {
@@ -42,11 +53,11 @@ export default function LocationCard({ filters }) {
       return;
     }
 
-    const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(
-      q
-    )}.json?key=${MAPTILER_KEY}&language=de`;
-
-    const res = await fetch(url);
+    const res = await fetch(
+      `https://api.maptiler.com/geocoding/${encodeURIComponent(
+        q
+      )}.json?key=${MAPTILER_KEY}&language=de`
+    );
     const data = await res.json();
 
     setSuggestions(
@@ -65,191 +76,208 @@ export default function LocationCard({ filters }) {
     setSuggestions([]);
   }
 
-  /* ---------------------------------------------------------- */
-  /* LEAFLET MAP                                                 */
-  /* ---------------------------------------------------------- */
+  /* ---------------- Map ---------------- */
 
   useEffect(() => {
     let cancelled = false;
 
-    async function ensureLeaflet() {
-      if (!document.querySelector('link[data-leaflet]')) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://unpkg.com/leaflet@1.9.3/dist/leaflet.css";
-        link.setAttribute("data-leaflet", "1");
-        document.head.appendChild(link);
-      }
-
+    async function loadLeaflet() {
       if (!window.L) {
         await new Promise((resolve) => {
-          const s = document.createElement("script");
-          s.src = "https://unpkg.com/leaflet@1.9.3/dist/leaflet.js";
-          s.onload = resolve;
-          document.body.appendChild(s);
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href =
+            "https://unpkg.com/leaflet@1.9.3/dist/leaflet.css";
+          document.head.appendChild(link);
+
+          const script = document.createElement("script");
+          script.src =
+            "https://unpkg.com/leaflet@1.9.3/dist/leaflet.js";
+          script.onload = resolve;
+          document.body.appendChild(script);
         });
       }
-
       return window.L;
     }
 
     async function init() {
       if (!mapRef.current) return;
-
-      const L = await ensureLeaflet();
+      const L = await loadLeaflet();
       if (cancelled) return;
 
-      leafletRef.current.L = L;
-
       if (!leafletRef.current.map) {
-        const map = L.map(mapRef.current).setView([lat, lon], 11);
-        leafletRef.current.map = map;
+        leafletRef.current.map = L.map(mapRef.current, {
+          zoomControl: false,
+        }).setView([lat, lon], 11);
 
         L.tileLayer(
-          `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
-          { attribution: "&copy; MapTiler" }
-        ).addTo(map);
+          `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`
+        ).addTo(leafletRef.current.map);
       }
 
-      draw(lat, lon, radius);
-    }
+      leafletRef.current.marker?.remove();
+      leafletRef.current.circle?.remove();
 
-    function draw(cLat, cLon, rKm) {
-      const { L, map, marker, circle } = leafletRef.current;
-      if (!L || !map) return;
-
-      if (marker) marker.remove();
-      if (circle) circle.remove();
-
-      const m = L.marker([cLat, cLon]).addTo(map);
-      const c = L.circle([cLat, cLon], {
-        radius: rKm * 1000,
-        color: "#1d4ed8",
+      leafletRef.current.marker = L.marker([lat, lon]).addTo(
+        leafletRef.current.map
+      );
+      leafletRef.current.circle = L.circle([lat, lon], {
+        radius: radius * 1000,
+        color: "#2563eb",
         fillOpacity: 0.2,
-      }).addTo(map);
+      }).addTo(leafletRef.current.map);
 
-      leafletRef.current.marker = m;
-      leafletRef.current.circle = c;
-
-      map.fitBounds(c.getBounds(), { padding: [20, 20] });
+      leafletRef.current.map.fitBounds(
+        leafletRef.current.circle.getBounds(),
+        { padding: [20, 20] }
+      );
     }
 
     init();
-
     return () => {
       cancelled = true;
     };
   }, [lat, lon, radius]);
 
-  /* ---------------------------------------------------------- */
-  /* FIRESTORE SPEICHERN – lastSearch                            */
-  /* ---------------------------------------------------------- */
+  /* ---------------- Chip Style (identisch zu ObjectCard) ---------------- */
 
-  async function save() {
-    if (!user?.uid) return;
-
-    try {
-      const ref = doc(db, "users", user.uid);
-
-      await updateDoc(ref, {
-        lastSearch: {
-          ...(filters || {}),
-          coordinate: { lat, lon },
-          radiusInKm: radius,
-        },
-      });
-
-      setEditMode(false);
-    } catch (err) {
-      console.error("LocationCard save failed", err);
+  const chipClass = (active) => {
+    const base =
+      "px-4 py-2 text-sm rounded-full border transition-all duration-200";
+    if (active) {
+      return isEditing
+        ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
+        : `${base} bg-gray-200 border-gray-200 text-gray-700`;
     }
-  }
+    return isEditing
+      ? `${base} bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400`
+      : `${base} bg-white border-gray-200 text-gray-500`;
+  };
 
-  /* ---------------------------------------------------------- */
+  /* ---------------- Render ---------------- */
 
   return (
-    <section className="mb-6 rounded-2xl border border-gray-200 bg-slate-50 p-5">
-      <header className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Standort & Radius
-        </h2>
-        <button
-          onClick={() => setEditMode((v) => !v)}
-          className="rounded-full border border-gray-900 px-3 py-1 text-xs font-medium"
-        >
-          {editMode ? "Fertig" : "Bearbeiten"}
-        </button>
-      </header>
+    <FilterFrame
+      isEditing={isEditing}
+      header={
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
+              Standort & Radius
+            </h2>
 
-      {/* Adresseingabe */}
-      {editMode && (
-        <div className="relative mb-3">
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Adresse eingeben
-          </label>
-          <input
-            type="text"
-            value={address}
-            onChange={(e) => {
-              setAddress(e.target.value);
-              searchAddress(e.target.value);
-            }}
-            placeholder="z.B. Berlin Alexanderplatz"
-            className="w-full rounded-xl border px-3 py-2 text-sm"
-          />
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={enterEdit}
+                className="
+                  inline-flex items-center
+                  mt-2
+                  px-3 py-1.5
+                  text-sm font-semibold
+                  rounded-full
+                  bg-gray-200 text-gray-800
+                  hover:bg-gray-300
+                  transition
+                "
+              >
+                Bearbeiten
+              </button>
+            )}
+          </div>
 
-          {suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 mt-1 rounded-xl border bg-white shadow z-10 max-h-40 overflow-auto">
-              {suggestions.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => selectAddress(s)}
-                  className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+          {isEditing && (
+            <button
+              type="button"
+              onClick={finishEdit}
+              className="
+                shrink-0
+                px-5 py-2
+                text-sm font-semibold
+                rounded-xl
+                bg-blue-600 text-white
+                hover:bg-blue-700
+                transition
+              "
+            >
+              Fertig
+            </button>
           )}
         </div>
-      )}
+      }
+    >
+      {/* Body */}
+      <div className="relative">
+        <div className="space-y-8">
+          {/* Edit-Felder */}
+          {isEditing && (
+            <div className="space-y-4">
+              <div className="relative">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">
+                  Adresse suchen
+                </label>
+                <input
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    searchAddress(e.target.value);
+                  }}
+                  className="w-full rounded-xl border-gray-300 bg-gray-50 px-4 py-3 text-sm"
+                  placeholder="z.B. Berlin Alexanderplatz"
+                />
 
-      {/* Radius Buttons */}
-      {editMode && (
-        <div className="mb-3">
-          <p className="text-xs text-gray-600 mb-1">Radius</p>
-          <div className="flex flex-wrap gap-2">
-            {[5, 7.5, 10, 12.5, 15, 20].map((km) => (
-              <button
-                key={km}
-                onClick={() => setRadius(km)}
-                className={`px-3 py-1 rounded-full text-xs border ${
-                  radius === km
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-800"
-                }`}
-              >
-                {km} km
-              </button>
-            ))}
+                {suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 mt-1 rounded-xl border bg-white shadow-xl z-50 max-h-40 overflow-auto">
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => selectAddress(s)}
+                        className="block w-full text-left px-4 py-3 text-sm hover:bg-blue-50 border-b last:border-0"
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-base font-bold text-gray-800 mb-4">
+                  Radius
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {RADIUS_OPTIONS.map((km) => (
+                    <button
+                      key={km}
+                      type="button"
+                      disabled={!isEditing}
+                      onClick={() => setRadius(km)}
+                      className={chipClass(radius === km)}
+                    >
+                      {km} km
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Map */}
+          <div className="h-64 w-full rounded-2xl border border-gray-200 overflow-hidden">
+            <div ref={mapRef} className="h-full w-full bg-gray-100" />
           </div>
         </div>
-      )}
 
-      {/* MAP */}
-      <div ref={mapRef} className="h-72 w-full rounded-xl border bg-gray-200" />
-
-      {/* Speichern */}
-      {editMode && (
-        <div className="flex justify-end mt-4">
+        {/* Click-anywhere Overlay – GENAU wie ObjectCard */}
+        {!isEditing && (
           <button
-            onClick={save}
-            className="px-4 py-2 rounded-full bg-gray-900 text-white text-xs"
-          >
-            Speichern
-          </button>
-        </div>
-      )}
-    </section>
+            type="button"
+            onClick={enterEdit}
+            className="absolute inset-0 rounded-xl cursor-pointer bg-transparent"
+            aria-label="Bearbeiten aktivieren"
+          />
+        )}
+      </div>
+    </FilterFrame>
   );
 }

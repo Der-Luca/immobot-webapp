@@ -1,138 +1,235 @@
 import { useEffect, useMemo, useState } from "react";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
-import { useAuth } from "../../../contexts/AuthContext";
+import FilterFrame from "./FilterFrame";
 
-function Chip({ active, onClick, children }) {
+/* ---------- Chip: IDENTISCH zu ObjectCard ---------- */
+function Chip({ active, onClick, children, disabled, isEditing }) {
+  const base =
+    "px-4 py-2 text-sm rounded-full font-medium transition-all duration-200 border";
+
+  if (active) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className={
+          isEditing
+            ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
+            : `${base} bg-gray-200 border-gray-200 text-gray-700`
+        }
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
-      className={`px-3 py-2 rounded-full border text-sm ${
-        active ? "bg-blue-600 text-white" : "bg-white"
-      }`}
+      className={
+        isEditing
+          ? `${base} bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400`
+          : `${base} bg-white border-gray-200 text-gray-400`
+      }
     >
       {children}
     </button>
   );
 }
 
+/* ---------- Presets ---------- */
+
 const RENT_PRESETS = [600, 800, 1000, 1200, 1500, null];
 const BUY_PRESETS = [200000, 300000, 400000, 500000, 750000, 1000000, null];
-const SPACE_PRESETS = [40, 60, 80, 100, 120, 150, 200, null];
 
-export default function PriceCard({ filters }) {
-  const { user } = useAuth();
+const SPACE_PRESETS_APARTMENT = [
+  { label: "bis 100 m²", from: null, to: 100 },
+  { label: "ab 100 m²", from: 100, to: null },
+  { label: "beliebig", from: null, to: null },
+];
+
+const SPACE_PRESETS_PLOT = [
+  { label: "bis 500 m²", from: null, to: 500 },
+  { label: "ab 500 m²", from: 500, to: null },
+  { label: "beliebig", from: null, to: null },
+];
+
+export default function PriceCard({ filters, onChange }) {
+  const [isEditing, setIsEditing] = useState(false);
 
   const isRentOnly =
     filters.offerTypes?.includes("Miete") &&
     !filters.offerTypes?.includes("Kauf");
+
+  const isGrundstueck = filters.objectClasses?.includes("Grundstueck");
 
   const pricePresets = useMemo(
     () => (isRentOnly ? RENT_PRESETS : BUY_PRESETS),
     [isRentOnly]
   );
 
-  const [priceTo, setPriceTo] = useState(filters.priceRange?.to ?? null);
-  const [spaceTo, setSpaceTo] = useState(
-    filters.propertySpaceRange?.to ?? null
-  );
+  const spacePresets = isGrundstueck
+    ? SPACE_PRESETS_PLOT
+    : SPACE_PRESETS_APARTMENT;
 
-  // 🔥 wichtig: sync bei async geladenen filters
+  const [priceTo, setPriceTo] = useState(filters.priceRange?.to ?? null);
+  const [spaceRange, setSpaceRange] = useState({
+    from: filters.propertySpaceRange?.from ?? null,
+    to: filters.propertySpaceRange?.to ?? null,
+  });
+
   useEffect(() => {
     setPriceTo(filters.priceRange?.to ?? null);
-    setSpaceTo(filters.propertySpaceRange?.to ?? null);
+    setSpaceRange({
+      from: filters.propertySpaceRange?.from ?? null,
+      to: filters.propertySpaceRange?.to ?? null,
+    });
   }, [filters]);
 
-  const title = isRentOnly
-    ? "Was ist dein persönlicher Höchstpreis (Miete)?"
-    : "Was ist dein persönlicher Höchstpreis (Kauf)?";
+  const enterEdit = () => setIsEditing(true);
 
-  const fmtEUR = (n) =>
-    typeof n === "number" ? `bis ${n.toLocaleString("de-DE")} €` : "beliebig";
+  const fmtEUR = (val, idx) => {
+    if (val == null) return "beliebig";
+    const formatted = val.toLocaleString("de-DE");
 
-  const fmtQM = (n) =>
-    typeof n === "number" ? `bis ${n} qm` : "beliebig";
+    if (isRentOnly) return `bis ${formatted} €`;
 
-  // ✅ NUR NOCH users/{uid}
-  const ref = user?.uid && doc(db, "users", user.uid);
+    const isLastNumber =
+      idx === pricePresets.length - 2 &&
+      pricePresets[pricePresets.length - 1] === null;
 
-  async function saveFilters(next) {
-    if (!ref) return;
+    return isLastNumber ? `ab ${formatted} €` : `bis ${formatted} €`;
+  };
 
-    await setDoc(
-      ref,
-      {
-        lastSearch: next,
-      },
-      { merge: true }
-    );
-  }
-
-  const selectPrice = async (to) => {
+  const selectPrice = (to) => {
+    if (!isEditing) return;
     setPriceTo(to);
-    await saveFilters({
+    onChange({
       ...filters,
-      priceRange: {
-        ...(filters.priceRange || {}),
-        to,
-      },
+      priceRange: { ...(filters.priceRange || {}), to },
     });
   };
 
-  const selectSpace = async (to) => {
-    setSpaceTo(to);
-    await saveFilters({
+  const selectSpace = (preset) => {
+    if (!isEditing) return;
+    setSpaceRange({ from: preset.from, to: preset.to });
+    onChange({
       ...filters,
-      propertySpaceRange: {
-        ...(filters.propertySpaceRange || {}),
-        to,
-      },
+      propertySpaceRange: { from: preset.from, to: preset.to },
     });
   };
-
-  // gleiches Verhalten wie vorher bei Wechsel Kauf/Miete
-  useEffect(() => {
-    if (!ref) return;
-
-    setPriceTo(null);
-
-    saveFilters({
-      ...filters,
-      priceRange: {
-        ...(filters.priceRange || {}),
-        to: null,
-      },
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRentOnly]);
 
   return (
-    <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">
-        Preis & Fläche
-      </p>
+    <FilterFrame
+      isEditing={isEditing}
+      header={
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              Preis & Fläche
+            </h2>
 
-      <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={enterEdit}
+                className="
+                  inline-flex items-center
+                  mt-2
+                  px-3 py-1.5
+                  text-sm font-semibold
+                  rounded-full
+                  bg-gray-200 text-gray-800
+                  hover:bg-gray-300
+                  transition
+                "
+              >
+                Bearbeiten
+              </button>
+            )}
+          </div>
 
-      <div className="flex flex-wrap gap-2">
-        {pricePresets.map((p, i) => (
-          <Chip key={i} active={priceTo === p} onClick={() => selectPrice(p)}>
-            {fmtEUR(p)}
-          </Chip>
-        ))}
-      </div>
-
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Fläche:</label>
-        <div className="flex flex-wrap gap-2">
-          {SPACE_PRESETS.map((s, i) => (
-            <Chip key={i} active={spaceTo === s} onClick={() => selectSpace(s)}>
-              {fmtQM(s)}
-            </Chip>
-          ))}
+          {isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="
+                px-5 py-2
+                text-sm font-semibold
+                rounded-xl
+                bg-blue-600 text-white
+                hover:bg-blue-700
+                transition
+              "
+            >
+              Fertig
+            </button>
+          )}
         </div>
+      }
+    >
+      {/* Body */}
+      <div className="relative">
+        <div className="space-y-8">
+          <div>
+            <h3 className="text-base font-bold text-gray-800 mb-4">
+              {isRentOnly ? "Maximale Kaltmiete" : "Maximaler Kaufpreis"}
+            </h3>
+
+            <div className="flex flex-wrap gap-2">
+              {pricePresets.map((p, i) => (
+                <Chip
+                  key={i}
+                  active={priceTo === p}
+                  onClick={() => selectPrice(p)}
+                  disabled={!isEditing}
+                  isEditing={isEditing}
+                >
+                  {fmtEUR(p, i)}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-base font-bold text-gray-800 mb-4">
+              {isGrundstueck ? "Grundstücksfläche" : "Wohnfläche"}
+            </h3>
+
+            <div className="flex flex-wrap gap-2">
+              {spacePresets.map((preset, i) => {
+                const active =
+                  spaceRange.from === preset.from &&
+                  spaceRange.to === preset.to;
+
+                return (
+                  <Chip
+                    key={i}
+                    active={active}
+                    onClick={() => selectSpace(preset)}
+                    disabled={!isEditing}
+                    isEditing={isEditing}
+                  >
+                    {preset.label}
+                  </Chip>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Click-anywhere Overlay im View-Mode */}
+        {!isEditing && (
+          <button
+            type="button"
+            onClick={enterEdit}
+            className="absolute inset-0 rounded-xl bg-transparent"
+            aria-label="Bearbeiten aktivieren"
+          />
+        )}
       </div>
-    </section>
+    </FilterFrame>
   );
 }
