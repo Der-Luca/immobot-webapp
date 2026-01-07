@@ -3,21 +3,116 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { readStep5State, toggleInArray, setRange } from "./storage/step5.js";
 
-// Optionen lt. Geomap-API
+/* ------------------- Options (value=API-safe, label=UI) ------------------- */
+
 const ENERGY_SOURCES = [
-  "Erdgas","Erdwaerme","Fernwaerme","Fluessiggas","Gas","Holz","Kohle",
-  "Luftwaerme","Nahwaerme","Oel","Pellets","Solar","Strom","Wasserwaerme","Alternativ"
+  { value: "Erdgas", label: "Erdgas" },
+  { value: "Erdwaerme", label: "Erdwärme" },
+  { value: "Fernwaerme", label: "Fernwärme" },
+  { value: "Fluessiggas", label: "Flüssiggas" },
+  { value: "Gas", label: "Gas" },
+  { value: "Holz", label: "Holz" },
+  { value: "Kohle", label: "Kohle" },
+  { value: "Luftwaerme", label: "Luftwärme" },
+  { value: "Nahwaerme", label: "Nahwärme" },
+  { value: "Oel", label: "Öl" },
+  { value: "Pellets", label: "Pellets" },
+  { value: "Solar", label: "Solar" },
+  { value: "Strom", label: "Strom" },
+  { value: "Wasserwaerme", label: "Wasserwärme" },
+  { value: "Alternativ", label: "Alternativ" },
 ];
+
 const HEATING_TYPES = [
-  "Blockheizkraftwerk","Etagenheizung","Fernheizung","Fussbodenheizung","Kachelofen",
-  "Kamin","Nachtspeicher","Ofenheizung","Solarheizung","Waermepumpe","Zentralheizung"
+  { value: "Blockheizkraftwerk", label: "Blockheizkraftwerk" },
+  { value: "Etagenheizung", label: "Etagenheizung" },
+  { value: "Fernheizung", label: "Fernheizung" },
+  { value: "Fussbodenheizung", label: "Fußbodenheizung" },
+  { value: "Kachelofen", label: "Kachelofen" },
+  { value: "Kamin", label: "Kamin" },
+  { value: "Nachtspeicher", label: "Nachtspeicher" },
+  { value: "Ofenheizung", label: "Ofenheizung" },
+  { value: "Solarheizung", label: "Solarheizung" },
+  { value: "Waermepumpe", label: "Wärmepumpe" },
+  { value: "Zentralheizung", label: "Zentralheizung" },
 ];
-const ENERGY_RATINGS = ["A3Plus","A2Plus","APlus","A","B","C","D","E","F","G","H"];
+
+const ENERGY_RATINGS = [
+  { value: "A3Plus", label: "A+++ (A3Plus)" },
+  { value: "A2Plus", label: "A++ (A2Plus)" },
+  { value: "APlus", label: "A+ (APlus)" },
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C", label: "C" },
+  { value: "D", label: "D" },
+  { value: "E", label: "E" },
+  { value: "F", label: "F" },
+  { value: "G", label: "G" },
+  { value: "H", label: "H" },
+];
+
 const EFFICIENCY_STANDARDS = [
-  "KfwEffizienzhausDenkmal","KfwEffizienzhaus115","KfwEffizienzhaus100","KfwEffizienzhaus85",
-  "KfwEffizienzhaus70","KfwEffizienzhaus60","KfwEffizienzhaus55","KfwEffizienzhaus40",
-  "KfwEffizienzhaus40Plus","Passivhaus","Nullenergiehaus","Plusenergiehaus"
+  { value: "KfwEffizienzhausDenkmal", label: "KfW Effizienzhaus Denkmal" },
+  { value: "KfwEffizienzhaus115", label: "KfW Effizienzhaus 115" },
+  { value: "KfwEffizienzhaus100", label: "KfW Effizienzhaus 100" },
+  { value: "KfwEffizienzhaus85", label: "KfW Effizienzhaus 85" },
+  { value: "KfwEffizienzhaus70", label: "KfW Effizienzhaus 70" },
+  { value: "KfwEffizienzhaus60", label: "KfW Effizienzhaus 60" },
+  { value: "KfwEffizienzhaus55", label: "KfW Effizienzhaus 55" },
+  { value: "KfwEffizienzhaus40", label: "KfW Effizienzhaus 40" },
+  { value: "KfwEffizienzhaus40Plus", label: "KfW Effizienzhaus 40+" },
+  { value: "Passivhaus", label: "Passivhaus" },
+  { value: "Nullenergiehaus", label: "Nullenergiehaus" },
+  { value: "Plusenergiehaus", label: "Plusenergiehaus" },
 ];
+
+/* ------------------- Helpers ------------------- */
+
+const toNumOrNull = (v) => {
+  if (v === "" || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const roundToStep = (n, step) => {
+  if (!step || step <= 0) return n;
+  return Math.round(n / step) * step;
+};
+
+function normalizeRange(fromStr, toStr, { step = 1, min = null, max = null, integer = false } = {}) {
+  let from = toNumOrNull(fromStr);
+  let to = toNumOrNull(toStr);
+
+  if (from != null) {
+    from = roundToStep(from, step);
+    if (integer) from = Math.round(from);
+    if (min != null) from = Math.max(min, from);
+    if (max != null) from = Math.min(max, from);
+  }
+
+  if (to != null) {
+    to = roundToStep(to, step);
+    if (integer) to = Math.round(to);
+    if (min != null) to = Math.max(min, to);
+    if (max != null) to = Math.min(max, to);
+  }
+
+  // Wenn beide gesetzt und falsch rum -> swap
+  if (from != null && to != null && from > to) {
+    const tmp = from;
+    from = to;
+    to = tmp;
+  }
+
+  return {
+    from,
+    to,
+    fromStr: from == null ? "" : String(from),
+    toStr: to == null ? "" : String(to),
+  };
+}
+
+/* ------------------- Component ------------------- */
 
 export default function Step5Optional() {
   const navigate = useNavigate();
@@ -26,7 +121,7 @@ export default function Step5Optional() {
   // Sichtbarkeit der Extra-Filter (erst nach Klick)
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Arrays sicher initialisieren
+  // Arrays sicher initialisieren (values!)
   const [energySources, setES] = useState(s.energySources || []);
   const [heatingTypes, setHT] = useState(s.heatingTypes || []);
   const [energyRatings, setER] = useState(s.energyRatings || []);
@@ -34,13 +129,13 @@ export default function Step5Optional() {
 
   // Ranges als Strings für Inputs
   const [pqmFrom, setPqmFrom] = useState(s.pricePerSqmRange?.from ?? "");
-  const [pqmTo,   setPqmTo]   = useState(s.pricePerSqmRange?.to   ?? "");
-  const [yieldF,  setYieldF]  = useState(s.yieldRange?.from ?? "");
-  const [yieldT,  setYieldT]  = useState(s.yieldRange?.to   ?? "");
-  const [ecFrom,  setEcFrom]  = useState(s.energyConsumptionRange?.from ?? "");
-  const [ecTo,    setEcTo]    = useState(s.energyConsumptionRange?.to   ?? "");
-  const [byFrom,  setByFrom]  = useState(s.constructionYearRange?.from ?? "");
-  const [byTo,    setByTo]    = useState(s.constructionYearRange?.to   ?? "");
+  const [pqmTo, setPqmTo] = useState(s.pricePerSqmRange?.to ?? "");
+  const [yieldF, setYieldF] = useState(s.yieldRange?.from ?? "");
+  const [yieldT, setYieldT] = useState(s.yieldRange?.to ?? "");
+  const [ecFrom, setEcFrom] = useState(s.energyConsumptionRange?.from ?? "");
+  const [ecTo, setEcTo] = useState(s.energyConsumptionRange?.to ?? "");
+  const [byFrom, setByFrom] = useState(s.constructionYearRange?.from ?? "");
+  const [byTo, setByTo] = useState(s.constructionYearRange?.to ?? "");
 
   function toggleChip(key, value, setLocal) {
     toggleInArray(key, value);
@@ -52,10 +147,31 @@ export default function Step5Optional() {
   }
 
   function saveRanges() {
-    setRange("pricePerSqmRange",       pqmFrom, pqmTo);
-    setRange("yieldRange",             yieldF,  yieldT);
-    setRange("energyConsumptionRange", ecFrom,  ecTo);
-    setRange("constructionYearRange",  byFrom,  byTo);
+    // Preis pro m² (100er Schritte)
+    const pqm = normalizeRange(pqmFrom, pqmTo, { step: 100, min: 0 });
+    setPqmFrom(pqm.fromStr);
+    setPqmTo(pqm.toStr);
+    setRange("pricePerSqmRange", pqm.fromStr, pqm.toStr);
+
+    // Rendite (1er Schritte, Prozent)
+    const y = normalizeRange(yieldF, yieldT, { step: 1, min: 0 });
+    setYieldF(y.fromStr);
+    setYieldT(y.toStr);
+    setRange("yieldRange", y.fromStr, y.toStr);
+
+    // Energieverbrauch (50er Schritte) – kannst du auf 100 stellen, wenn du willst
+    const ec = normalizeRange(ecFrom, ecTo, { step: 50, min: 0 });
+    setEcFrom(ec.fromStr);
+    setEcTo(ec.toStr);
+    setRange("energyConsumptionRange", ec.fromStr, ec.toStr);
+
+    // Baujahr (integer)
+    const yearMin = 1800; // safe
+    const yearMax = new Date().getFullYear() + 1;
+    const by = normalizeRange(byFrom, byTo, { step: 1, min: yearMin, max: yearMax, integer: true });
+    setByFrom(by.fromStr);
+    setByTo(by.toStr);
+    setRange("constructionYearRange", by.fromStr, by.toStr);
   }
 
   return (
@@ -142,57 +258,58 @@ export default function Step5Optional() {
               <ChipGrid
                 options={EFFICIENCY_STANDARDS}
                 active={effStandards}
-                onToggle={(v) =>
-                  toggleChip("energyEfficiencyStandards", v, setEff)
-                }
+                onToggle={(v) => toggleChip("energyEfficiencyStandards", v, setEff)}
               />
             </Section>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Section title="Preis pro m²">
-                    <RangeRow
-                    unit="€/m²"
-                    from={pqmFrom}
-                    to={pqmTo}
-                    setFrom={setPqmFrom}
-                    setTo={setPqmTo}
-                    onBlurSave={saveRanges}
-                    />
-                </Section>
+              <Section title="Preis pro m²">
+                <RangeRow
+                  unit="€/m²"
+                  step="100"
+                  from={pqmFrom}
+                  to={pqmTo}
+                  setFrom={setPqmFrom}
+                  setTo={setPqmTo}
+                  onBlurSave={saveRanges}
+                />
+              </Section>
 
-                <Section title="Rendite">
-                    <RangeRow
-                    unit="%"
-                    step="0.1"
-                    from={yieldF}
-                    to={yieldT}
-                    setFrom={setYieldF}
-                    setTo={setYieldT}
-                    onBlurSave={saveRanges}
-                    />
-                </Section>
+              <Section title="Rendite">
+                <RangeRow
+                  unit="%"
+                  step="1"
+                  from={yieldF}
+                  to={yieldT}
+                  setFrom={setYieldF}
+                  setTo={setYieldT}
+                  onBlurSave={saveRanges}
+                />
+              </Section>
 
-                <Section title="Energieverbrauch">
-                    <RangeRow
-                    unit="kWh/m²*a"
-                    from={ecFrom}
-                    to={ecTo}
-                    setFrom={setEcFrom}
-                    setTo={setEcTo}
-                    onBlurSave={saveRanges}
-                    />
-                </Section>
+              <Section title="Energieverbrauch">
+                <RangeRow
+                  unit="kWh/m²*a"
+                  step="50"
+                  from={ecFrom}
+                  to={ecTo}
+                  setFrom={setEcFrom}
+                  setTo={setEcTo}
+                  onBlurSave={saveRanges}
+                />
+              </Section>
 
-                <Section title="Baujahr">
-                    <RangeRow
-                    unit=""
-                    from={byFrom}
-                    to={byTo}
-                    setFrom={setByFrom}
-                    setTo={setByTo}
-                    onBlurSave={saveRanges}
-                    />
-                </Section>
+              <Section title="Baujahr">
+                <RangeRow
+                  unit=""
+                  step="1"
+                  from={byFrom}
+                  to={byTo}
+                  setFrom={setByFrom}
+                  setTo={setByTo}
+                  onBlurSave={saveRanges}
+                />
+              </Section>
             </div>
           </div>
         </>
@@ -220,7 +337,7 @@ export default function Step5Optional() {
             Registrieren &gt;
           </button>
         ) : (
-          <div /> 
+          <div />
         )}
       </div>
     </div>
@@ -241,22 +358,25 @@ function ChipGrid({ options, active = [], onToggle }) {
   return (
     <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto">
       {options.map((opt) => {
-        const isActive = active?.includes(opt);
+        const value = typeof opt === "string" ? opt : opt.value;
+        const label = typeof opt === "string" ? opt : opt.label;
+
+        const isActive = active?.includes(value);
+
         return (
           <button
-            key={opt}
+            key={value}
             type="button"
-            onClick={() => onToggle(opt)}
-            // Buttons optimiert für Touch (padding, scale)
+            onClick={() => onToggle(value)}
             className={`inline-flex items-center justify-center rounded-full border px-3 py-2 text-xs transition active:scale-95
               ${
                 isActive
                   ? "bg-blue-600 text-white border-blue-600 shadow-sm"
                   : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
               }`}
-            title={opt}
+            title={value}
           >
-            {opt}
+            {label}
           </button>
         );
       })}
@@ -265,10 +385,8 @@ function ChipGrid({ options, active = [], onToggle }) {
 }
 
 function RangeRow({ unit, from, to, setFrom, setTo, step = "1", onBlurSave }) {
-  // Layout geändert: Side-by-Side (flex-row) statt übereinander, damit es auf dem Handy nicht so lang wird
   return (
     <div className="flex items-end justify-center gap-3 w-full max-w-sm mx-auto">
-      {/* von */}
       <div className="flex-1">
         <label className="block text-xs text-gray-500 mb-1 text-center">von</label>
         <input
@@ -277,7 +395,6 @@ function RangeRow({ unit, from, to, setFrom, setTo, step = "1", onBlurSave }) {
           value={from}
           onChange={(e) => setFrom(e.target.value)}
           onBlur={onBlurSave}
-          // py-2.5 für bessere Touch-Bedienung
           className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-center text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           placeholder="0"
         />
@@ -285,7 +402,6 @@ function RangeRow({ unit, from, to, setFrom, setTo, step = "1", onBlurSave }) {
 
       <span className="text-gray-400 pb-3">-</span>
 
-      {/* bis */}
       <div className="flex-1">
         <label className="block text-xs text-gray-500 mb-1 text-center">bis</label>
         <input
@@ -299,7 +415,6 @@ function RangeRow({ unit, from, to, setFrom, setTo, step = "1", onBlurSave }) {
         />
       </div>
 
-      {/* Einheit */}
       {unit && <span className="text-xs text-gray-500 pb-3 w-10">{unit}</span>}
     </div>
   );

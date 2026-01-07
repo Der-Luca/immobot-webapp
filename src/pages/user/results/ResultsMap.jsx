@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 
-const MAPTILER_KEY = "VUVj9lGbHQAdYVsF04k8";
+// ✅ Hier holen wir den Key sicher aus der .env Datei
+// Falls du nicht Vite nutzt, sondern Create-React-App, nutze process.env.REACT_APP_MAPTILER_KEY
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
 export default function ResultsMap({ offers = [], onMarkerClick }) {
   const mapRef = useRef(null);
@@ -34,7 +36,12 @@ export default function ResultsMap({ offers = [], onMarkerClick }) {
         leafletRef.current.map = L.map(mapRef.current).setView([51, 10], 6);
         leafletRef.current.L = L;
 
-        // ✅ GLEICHES MAP-DESIGN WIE BEI DIR
+        // Sicherheitscheck, falls Key in .env vergessen wurde
+        if (!MAPTILER_KEY) {
+            console.error("MapTiler Key fehlt in der .env Datei!");
+        }
+
+        // ✅ KEY WIRD HIER EINGESETZT
         L.tileLayer(
           `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
           { attribution: "&copy; MapTiler" }
@@ -62,7 +69,6 @@ export default function ResultsMap({ offers = [], onMarkerClick }) {
       valid.forEach((o) => {
         const marker = L.marker([o.latitude, o.longitude])
           .addTo(map)
-          // ✅ Sprechblase wieder da
           .bindPopup(`
             <div style="min-width:180px">
               <strong>${o.title || "Ohne Titel"}</strong><br/>
@@ -72,8 +78,8 @@ export default function ResultsMap({ offers = [], onMarkerClick }) {
           `);
 
         marker.on("click", () => {
-          marker.openPopup();          // 👈 visuelles Feedback
-          onMarkerClick?.(o.docId);    // 👈 Liste links highlighten
+          marker.openPopup();
+          onMarkerClick?.(o.docId);
         });
 
         leafletRef.current.markers.push(marker);

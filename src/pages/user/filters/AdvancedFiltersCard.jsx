@@ -34,12 +34,20 @@ const HEATING_TYPES = [
   { value: "Zentralheizung", label: "Zentralheizung" },
 ];
 
-const ENERGY_RATINGS = ["A3Plus","A2Plus","APlus","A","B","C","D","E","F","G","H"];
+const ENERGY_RATINGS = ["A3Plus", "A2Plus", "APlus", "A", "B", "C", "D", "E", "F", "G", "H"];
 const EFFICIENCY_STANDARDS = [
-  "KfwEffizienzhausDenkmal","KfwEffizienzhaus115","KfwEffizienzhaus100",
-  "KfwEffizienzhaus85","KfwEffizienzhaus70","KfwEffizienzhaus60",
-  "KfwEffizienzhaus55","KfwEffizienzhaus40","KfwEffizienzhaus40Plus",
-  "Passivhaus","Nullenergiehaus","Plusenergiehaus"
+  "KfwEffizienzhausDenkmal",
+  "KfwEffizienzhaus115",
+  "KfwEffizienzhaus100",
+  "KfwEffizienzhaus85",
+  "KfwEffizienzhaus70",
+  "KfwEffizienzhaus60",
+  "KfwEffizienzhaus55",
+  "KfwEffizienzhaus40",
+  "KfwEffizienzhaus40Plus",
+  "Passivhaus",
+  "Nullenergiehaus",
+  "Plusenergiehaus",
 ];
 
 /* ------------------- Helpers ------------------- */
@@ -47,9 +55,7 @@ const EFFICIENCY_STANDARDS = [
 function Section({ title, children }) {
   return (
     <div>
-      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-        {title}
-      </h3>
+      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">{title}</h3>
       {children}
     </div>
   );
@@ -63,16 +69,15 @@ function ChipGrid({ options, active = [], onToggle, isEditing }) {
         const label = typeof opt === "string" ? opt : opt.label;
         const isActive = active.includes(val);
 
-        const base =
-          "px-3 py-1.5 text-xs font-medium rounded-full border transition-all";
+        const base = "px-3 py-1.5 text-xs font-medium rounded-full border transition-all";
 
         const cls = isActive
           ? isEditing
             ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
             : `${base} bg-gray-200 border-gray-200 text-gray-700`
           : isEditing
-            ? `${base} bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400`
-            : `${base} bg-white border-gray-200 text-gray-400`;
+          ? `${base} bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400`
+          : `${base} bg-white border-gray-200 text-gray-400`;
 
         return (
           <button
@@ -90,33 +95,121 @@ function ChipGrid({ options, active = [], onToggle, isEditing }) {
   );
 }
 
-function RangeInput({ from, to, unit, onChangeFrom, onChangeTo, isEditing }) {
+/** Baue Zahlen-Optionen in Schritten (inkl. max) */
+function buildSteps(min, max, step) {
+  const out = [];
+  for (let v = min; v <= max; v += step) out.push(v);
+  return out;
+}
+
+/**
+ * Dropdown-Range:
+ * - Nur Werte aus Options
+ * - Erzwingt from <= to (wenn beides gesetzt)
+ * - Wenn User "falschrum" wählt: wir korrigieren automatisch (swap)
+ * - To-Optionen werden zusätzlich so gefiltert, dass sie >= from sind (UX)
+ */
+function RangeSelect({
+  from,
+  to,
+  unit,
+  options,
+  isEditing,
+  onChange,
+  placeholders = { from: "von", to: "bis" },
+}) {
+  const fromVal = from ?? null;
+  const toVal = to ?? null;
+
+  const toOptions = fromVal == null ? options : options.filter((v) => v >= fromVal);
+
+  const apply = (nextFrom, nextTo) => {
+    let f = nextFrom ?? null;
+    let t = nextTo ?? null;
+
+    // Wenn beide gesetzt und falschrum -> swap (harte Absicherung für API)
+    if (f != null && t != null && f > t) {
+      const tmp = f;
+      f = t;
+      t = tmp;
+    }
+
+    onChange({ from: f, to: t });
+  };
+
   return (
     <div className="flex items-center gap-2 max-w-xs">
-      <input
-        type="number"
-        value={from ?? ""}
+      <select
         disabled={!isEditing}
-        onChange={(e) => onChangeFrom(e.target.value)}
+        value={fromVal ?? ""}
+        onChange={(e) => {
+          const v = e.target.value === "" ? null : Number(e.target.value);
+          apply(v, toVal);
+        }}
         className="w-24 rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm disabled:text-gray-400"
-        placeholder="von"
-      />
+      >
+        <option value="">{placeholders.from}</option>
+        {options.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+
       <span className="text-gray-400">-</span>
-      <input
-        type="number"
-        value={to ?? ""}
+
+      <select
         disabled={!isEditing}
-        onChange={(e) => onChangeTo(e.target.value)}
+        value={toVal ?? ""}
+        onChange={(e) => {
+          const v = e.target.value === "" ? null : Number(e.target.value);
+          apply(fromVal, v);
+        }}
         className="w-24 rounded-lg border-gray-300 bg-gray-50 px-3 py-2 text-sm disabled:text-gray-400"
-        placeholder="bis"
-      />
-      <span className="text-sm text-gray-500 font-medium ml-1">{unit}</span>
+      >
+        <option value="">{placeholders.to}</option>
+        {toOptions.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+
+      {unit ? <span className="text-sm text-gray-500 font-medium ml-1">{unit}</span> : null}
     </div>
   );
 }
 
-const toNumberOrNull = (v) =>
-  v === "" || v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null;
+/* ------------------- Range Options (sinnvoll) ------------------- */
+/**
+ * Preis pro m²:
+ * - 0..3000 in 100er
+ * - 3000..10000 in 250er
+ */
+const PRICE_PER_SQM_OPTIONS = [
+  ...buildSteps(0, 3000, 100),
+  ...buildSteps(3250, 10000, 250),
+];
+
+/**
+ * Rendite:
+ * 0..15 in 1er Schritten (realistisch & simpel)
+ */
+const YIELD_OPTIONS = buildSteps(0, 15, 1);
+
+/**
+ * Energieverbrauch (kWh/m²a):
+ * 0..500 in 50er Schritten (du wolltest „hundert oder so“ – 50 ist brauchbarer, aber nicht zu fein)
+ * Wenn du wirklich 100er willst: step=100
+ */
+const ENERGY_CONSUMPTION_OPTIONS = buildSteps(0, 500, 50);
+
+/**
+ * Baujahr:
+ * 1900..aktuelles Jahr in 5er Schritten (sonst wird's zu lang)
+ */
+const CURRENT_YEAR = new Date().getFullYear();
+const CONSTRUCTION_YEAR_OPTIONS = buildSteps(1900, CURRENT_YEAR, 5);
 
 /* ------------------- Main ------------------- */
 
@@ -127,19 +220,17 @@ export default function AdvancedFiltersCard({ filters, onChange }) {
   const toggleArray = (field, value) => {
     if (!isEditing) return;
     const current = filters[field] || [];
-    const next = current.includes(value)
-      ? current.filter((v) => v !== value)
-      : [...current, value];
-
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
     onChange({ ...filters, [field]: next });
   };
 
-  const updateRange = (field, key, value) => {
+  // 🔥 Wichtig: Range-Update immer über RangeSelect (inkl. from<=to Absicherung)
+  const updateRangeSafe = (field, nextRange) => {
     onChange({
       ...filters,
       [field]: {
-        ...(filters[field] || {}),
-        [key]: toNumberOrNull(value),
+        from: nextRange?.from ?? null,
+        to: nextRange?.to ?? null,
       },
     });
   };
@@ -161,9 +252,7 @@ export default function AdvancedFiltersCard({ filters, onChange }) {
       header={
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
-              Erweiterte Filter
-            </h2>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">Erweiterte Filter</h2>
 
             {!isEditing && (
               <button
@@ -244,64 +333,49 @@ export default function AdvancedFiltersCard({ filters, onChange }) {
 
         <hr className="border-gray-200/60" />
 
+        {/* ✅ NUR DIESER BLOCK UNTEN IST GEÄNDERT (Dropdown + API-Safe Range) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Section title="Preis pro m²">
-            <RangeInput
-              from={pricePerSqmRange.from}
-              to={pricePerSqmRange.to}
+            <RangeSelect
+              from={pricePerSqmRange.from ?? null}
+              to={pricePerSqmRange.to ?? null}
               unit="€/m²"
+              options={PRICE_PER_SQM_OPTIONS}
               isEditing={isEditing}
-              onChangeFrom={(v) =>
-                updateRange("pricePerSqmRange", "from", v)
-              }
-              onChangeTo={(v) =>
-                updateRange("pricePerSqmRange", "to", v)
-              }
+              onChange={(r) => updateRangeSafe("pricePerSqmRange", r)}
             />
           </Section>
 
           <Section title="Rendite">
-            <RangeInput
-              from={yieldRange.from}
-              to={yieldRange.to}
+            <RangeSelect
+              from={yieldRange.from ?? null}
+              to={yieldRange.to ?? null}
               unit="%"
+              options={YIELD_OPTIONS}
               isEditing={isEditing}
-              onChangeFrom={(v) =>
-                updateRange("yieldRange", "from", v)
-              }
-              onChangeTo={(v) =>
-                updateRange("yieldRange", "to", v)
-              }
+              onChange={(r) => updateRangeSafe("yieldRange", r)}
             />
           </Section>
 
           <Section title="Energieverbrauch">
-            <RangeInput
-              from={energyConsumptionRange.from}
-              to={energyConsumptionRange.to}
+            <RangeSelect
+              from={energyConsumptionRange.from ?? null}
+              to={energyConsumptionRange.to ?? null}
               unit="kWh"
+              options={ENERGY_CONSUMPTION_OPTIONS}
               isEditing={isEditing}
-              onChangeFrom={(v) =>
-                updateRange("energyConsumptionRange", "from", v)
-              }
-              onChangeTo={(v) =>
-                updateRange("energyConsumptionRange", "to", v)
-              }
+              onChange={(r) => updateRangeSafe("energyConsumptionRange", r)}
             />
           </Section>
 
           <Section title="Baujahr">
-            <RangeInput
-              from={constructionYearRange.from}
-              to={constructionYearRange.to}
+            <RangeSelect
+              from={constructionYearRange.from ?? null}
+              to={constructionYearRange.to ?? null}
               unit=""
+              options={CONSTRUCTION_YEAR_OPTIONS}
               isEditing={isEditing}
-              onChangeFrom={(v) =>
-                updateRange("constructionYearRange", "from", v)
-              }
-              onChangeTo={(v) =>
-                updateRange("constructionYearRange", "to", v)
-              }
+              onChange={(r) => updateRangeSafe("constructionYearRange", r)}
             />
           </Section>
         </div>

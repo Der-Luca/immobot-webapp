@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { getState, setState } from "./storage/index";
 import { toggleObjectClass } from "./storage/step1";
 
+/* ---------------- Objektarten (UI bleibt gleich) ---------------- */
+
 const CLASS_OPTIONS = [
   { label: "Haus", value: "Haus" },
   { label: "Wohnung", value: "Wohnung" },
@@ -18,6 +20,46 @@ const CLASS_OPTIONS = [
   { label: "Sonstige", value: "Sonstige" },
   { label: "Studentenwohnungen", value: "Studenten" },
 ];
+
+/* ---------------- Mapping: Class → Category ---------------- */
+
+const CLASS_TO_CATEGORY = {
+  // Wohnen
+  Haus: "Wohnen",
+  Wohnung: "Wohnen",
+  Studenten: "Wohnen",
+  Ferienobjekt: "Wohnen",
+
+  // Grundstück
+  Grundstueck: "Wohnen",
+
+  // Gewerbe
+  StellplatzGarage: "Gewerbe",
+  BüroPraxis: "Gewerbe",
+  Gastronomie: "Gewerbe",
+  Gewerbeeinheit: "Gewerbe",
+  HalleLagerProduktion: "Gewerbe",
+  Hotel: "Gewerbe",
+  LandForst: "Gewerbe",
+
+  // Fallback
+  Sonstige: "Wohnen",
+};
+
+/* ---------------- Helper ---------------- */
+
+function deriveObjectCategories(objectClasses = []) {
+  const set = new Set();
+
+  objectClasses.forEach((cls) => {
+    const cat = CLASS_TO_CATEGORY[cls];
+    if (cat) set.add(cat);
+  });
+
+  return Array.from(set);
+}
+
+/* ---------------- Component ---------------- */
 
 export default function Step1() {
   const nav = useNavigate();
@@ -49,32 +91,39 @@ export default function Step1() {
     const active = selectedClasses.includes(val);
     if (!active && selectedClasses.length >= 2) return;
 
-    const next = active
+    const nextClasses = active
       ? selectedClasses.filter((v) => v !== val)
       : [...selectedClasses, val];
 
-    setSelectedClasses(next);
+    setSelectedClasses(nextClasses);
+
+    // 🔥 ZENTRALER FIX
+    const nextCategories = deriveObjectCategories(nextClasses);
+
+    setState({
+      objectClasses: nextClasses,
+      objectCategories: nextCategories,
+    });
+
     toggleObjectClass(val);
   };
 
   return (
-    // ÄNDERUNGEN HIER:
-    // Mobile: Kein Border, keine Rundung, mt-2 (wenig Abstand oben)
-    // Desktop (ab md:): Border, rounded-2xl, mt-10 (viel Abstand), w-2/3
     <div className="
       w-full mx-auto max-w-2xl bg-white space-y-8
       p-4 mt-2
       md:p-6 md:mt-10 md:w-2/3 md:border md:rounded-2xl md:shadow-sm
     ">
-      <p className="text-center text-xs md:text-sm text-gray-500">Schritt 1 von 5</p>
+      <p className="text-center text-xs md:text-sm text-gray-500">
+        Schritt 1 von 5
+      </p>
 
-      {/* Titel */}
+      {/* Angebotsart */}
       <div className="space-y-2">
         <p className="block text-sm font-medium text-center">
           Angebotsart
         </p>
 
-        {/* Angebotsart */}
         <div className="mx-auto max-w-md">
           <div className="flex items-center justify-center gap-2 flex-wrap">
             {[
@@ -114,6 +163,7 @@ export default function Step1() {
           {CLASS_OPTIONS.map((opt) => {
             const active = selectedClasses.includes(opt.value);
             const disabled = !active && selectedClasses.length >= 2;
+
             return (
               <button
                 key={opt.value}
@@ -140,7 +190,6 @@ export default function Step1() {
       <div className="flex justify-center mt-6">
         <button
           type="button"
-          // Button mobil volle Breite, Desktop normale Breite
           className="w-full sm:w-auto px-8 py-3 rounded-xl bg-blue-900 text-white font-medium shadow-sm active:scale-95 transition-transform"
           onClick={() => nav("/register/step2")}
         >

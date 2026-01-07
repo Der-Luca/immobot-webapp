@@ -26,17 +26,21 @@ export default function useUserFilters() {
         let lastSearch = snap.exists() ? snap.data()?.lastSearch : null;
 
         if (!lastSearch) {
+          // ✅ WICHTIG: objectCategories DEFAULT ergänzen
           lastSearch = {
             offerTypes: [],
             objectClasses: [],
+            objectCategories: [], // 🔥 DAS hat gefehlt
             priceRange: { to: null },
             propertySpaceRange: { from: null, to: null },
           };
 
           await setDoc(ref, { lastSearch }, { merge: true });
+        } else {
+          // 🛡️ Safety für Bestandsuser
+          lastSearch.objectCategories = lastSearch.objectCategories || [];
         }
 
-        // ❗ NICHT normalisieren / NICHT reduzieren
         setFilters(lastSearch);
         prevFiltersRef.current = lastSearch;
       } catch (err) {
@@ -62,6 +66,10 @@ export default function useUserFilters() {
         ...patch,
       };
 
+      // 🛡️ Safety: nie undefined
+      next.objectCategories = next.objectCategories || [];
+      next.objectClasses = next.objectClasses || [];
+
       /* 🔁 Reset-Logiken */
 
       // Miete ↔ Kauf
@@ -86,11 +94,11 @@ export default function useUserFilters() {
         };
       }
 
-      // UI sofort
+      // UI sofort aktualisieren
       setFilters(next);
       prevFiltersRef.current = next;
 
-      // 🔥 Firestore MERGE (nicht ersetzen!)
+      // 🔥 Firestore MERGE
       await setDoc(
         doc(db, "users", user.uid),
         { lastSearch: next },
