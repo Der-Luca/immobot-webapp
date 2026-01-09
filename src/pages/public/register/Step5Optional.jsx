@@ -38,9 +38,9 @@ const HEATING_TYPES = [
 ];
 
 const ENERGY_RATINGS = [
-  { value: "A3Plus", label: "A+++ (A3Plus)" },
-  { value: "A2Plus", label: "A++ (A2Plus)" },
-  { value: "APlus", label: "A+ (APlus)" },
+  { value: "A3Plus", label: "A+++" },
+  { value: "A2Plus", label: "A++" },
+  { value: "APlus", label: "A+" },
   { value: "A", label: "A" },
   { value: "B", label: "B" },
   { value: "C", label: "C" },
@@ -263,9 +263,9 @@ export default function Step5Optional() {
             </Section>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Section title="Preis pro m²">
+              <Section title="Preis pro m² (€/m)">
                 <RangeRow
-                  unit="€/m²"
+                  unit=""
                   step="100"
                   from={pqmFrom}
                   to={pqmTo}
@@ -275,9 +275,9 @@ export default function Step5Optional() {
                 />
               </Section>
 
-              <Section title="Rendite">
+              <Section title="Rendite (%)">
                 <RangeRow
-                  unit="%"
+                  unit=""
                   step="1"
                   from={yieldF}
                   to={yieldT}
@@ -287,9 +287,9 @@ export default function Step5Optional() {
                 />
               </Section>
 
-              <Section title="Energieverbrauch">
+              <Section title="Energieverbrauch (kWh/m²*a)">
                 <RangeRow
-                  unit="kWh/m²*a"
+                  unit=""
                   step="50"
                   from={ecFrom}
                   to={ecTo}

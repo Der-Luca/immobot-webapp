@@ -138,7 +138,29 @@ export default function ObjectCard({ filters, onChange }) {
     >
       <div className="relative">
         <div className="space-y-8">
-          {/* Objektarten */}
+         
+          <hr className="border-gray-200/60" />
+
+          {/* Angebotsart */}
+          <div>
+            <h3 className="text-base font-bold text-gray-800 mb-4">
+              Angebotsart
+            </h3>
+            <div className="flex flex-wrap gap-3">
+              {["Kauf", "Miete"].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setOfferType(v)}
+                  className={chipClass(offerTypes.includes(v))}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+           {/* Objektarten */}
           <div>
             <h3 className="text-base font-bold text-gray-800 mb-4">
               Objektarten
@@ -168,27 +190,6 @@ export default function ObjectCard({ filters, onChange }) {
             </div>
           </div>
 
-          <hr className="border-gray-200/60" />
-
-          {/* Angebotsart */}
-          <div>
-            <h3 className="text-base font-bold text-gray-800 mb-4">
-              Angebotsart
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              {["Kauf", "Miete"].map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  disabled={!isEditing}
-                  onClick={() => setOfferType(v)}
-                  className={chipClass(offerTypes.includes(v))}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {!isEditing && (

@@ -34,20 +34,35 @@ const HEATING_TYPES = [
   { value: "Zentralheizung", label: "Zentralheizung" },
 ];
 
-const ENERGY_RATINGS = ["A3Plus", "A2Plus", "APlus", "A", "B", "C", "D", "E", "F", "G", "H"];
+
+const ENERGY_RATINGS = [
+  { value: "A3Plus", label: "A+++" },
+  { value: "A2Plus", label: "A++" },
+  { value: "APlus", label: "A+" },
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C", label: "C" },
+  { value: "D", label: "D" },
+  { value: "E", label: "E" },
+  { value: "F", label: "F" },
+  { value: "G", label: "G" },
+  { value: "H", label: "H" },
+];
+
+
 const EFFICIENCY_STANDARDS = [
-  "KfwEffizienzhausDenkmal",
-  "KfwEffizienzhaus115",
-  "KfwEffizienzhaus100",
-  "KfwEffizienzhaus85",
-  "KfwEffizienzhaus70",
-  "KfwEffizienzhaus60",
-  "KfwEffizienzhaus55",
-  "KfwEffizienzhaus40",
-  "KfwEffizienzhaus40Plus",
-  "Passivhaus",
-  "Nullenergiehaus",
-  "Plusenergiehaus",
+  { value: "KfwEffizienzhausDenkmal", label: "KfW Denkmal" },
+  { value: "KfwEffizienzhaus115", label: "KfW 115" },
+  { value: "KfwEffizienzhaus100", label: "KfW 100" },
+  { value: "KfwEffizienzhaus85", label: "KfW 85" },
+  { value: "KfwEffizienzhaus70", label: "KfW 70" },
+  { value: "KfwEffizienzhaus60", label: "KfW 60" },
+  { value: "KfwEffizienzhaus55", label: "KfW 55" },
+  { value: "KfwEffizienzhaus40", label: "KfW 40" },
+  { value: "KfwEffizienzhaus40Plus", label: "KfW 40 Plus" },
+  { value: "Passivhaus", label: "Passivhaus" },
+  { value: "Nullenergiehaus", label: "Nullenergiehaus" },
+  { value: "Plusenergiehaus", label: "Plusenergiehaus" },
 ];
 
 /* ------------------- Helpers ------------------- */
@@ -65,6 +80,7 @@ function ChipGrid({ options, active = [], onToggle, isEditing }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => {
+        
         const val = typeof opt === "string" ? opt : opt.value;
         const label = typeof opt === "string" ? opt : opt.label;
         const isActive = active.includes(val);
@@ -102,13 +118,6 @@ function buildSteps(min, max, step) {
   return out;
 }
 
-/**
- * Dropdown-Range:
- * - Nur Werte aus Options
- * - Erzwingt from <= to (wenn beides gesetzt)
- * - Wenn User "falschrum" wählt: wir korrigieren automatisch (swap)
- * - To-Optionen werden zusätzlich so gefiltert, dass sie >= from sind (UX)
- */
 function RangeSelect({
   from,
   to,
@@ -127,7 +136,6 @@ function RangeSelect({
     let f = nextFrom ?? null;
     let t = nextTo ?? null;
 
-    // Wenn beide gesetzt und falschrum -> swap (harte Absicherung für API)
     if (f != null && t != null && f > t) {
       const tmp = f;
       f = t;
@@ -180,34 +188,15 @@ function RangeSelect({
   );
 }
 
-/* ------------------- Range Options (sinnvoll) ------------------- */
-/**
- * Preis pro m²:
- * - 0..3000 in 100er
- * - 3000..10000 in 250er
- */
+/* ------------------- Range Options ------------------- */
 const PRICE_PER_SQM_OPTIONS = [
   ...buildSteps(0, 3000, 100),
   ...buildSteps(3250, 10000, 250),
 ];
 
-/**
- * Rendite:
- * 0..15 in 1er Schritten (realistisch & simpel)
- */
 const YIELD_OPTIONS = buildSteps(0, 15, 1);
-
-/**
- * Energieverbrauch (kWh/m²a):
- * 0..500 in 50er Schritten (du wolltest „hundert oder so“ – 50 ist brauchbarer, aber nicht zu fein)
- * Wenn du wirklich 100er willst: step=100
- */
 const ENERGY_CONSUMPTION_OPTIONS = buildSteps(0, 500, 50);
 
-/**
- * Baujahr:
- * 1900..aktuelles Jahr in 5er Schritten (sonst wird's zu lang)
- */
 const CURRENT_YEAR = new Date().getFullYear();
 const CONSTRUCTION_YEAR_OPTIONS = buildSteps(1900, CURRENT_YEAR, 5);
 
@@ -224,7 +213,6 @@ export default function AdvancedFiltersCard({ filters, onChange }) {
     onChange({ ...filters, [field]: next });
   };
 
-  // 🔥 Wichtig: Range-Update immer über RangeSelect (inkl. from<=to Absicherung)
   const updateRangeSafe = (field, nextRange) => {
     onChange({
       ...filters,
@@ -333,35 +321,34 @@ export default function AdvancedFiltersCard({ filters, onChange }) {
 
         <hr className="border-gray-200/60" />
 
-        {/* ✅ NUR DIESER BLOCK UNTEN IST GEÄNDERT (Dropdown + API-Safe Range) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Section title="Preis pro m²">
+          <Section title="Preis pro m² (€/m²)">
             <RangeSelect
               from={pricePerSqmRange.from ?? null}
               to={pricePerSqmRange.to ?? null}
-              unit="€/m²"
+              unit=""
               options={PRICE_PER_SQM_OPTIONS}
               isEditing={isEditing}
               onChange={(r) => updateRangeSafe("pricePerSqmRange", r)}
             />
           </Section>
 
-          <Section title="Rendite">
+          <Section title="Rendite (%)">
             <RangeSelect
               from={yieldRange.from ?? null}
               to={yieldRange.to ?? null}
-              unit="%"
+              unit
               options={YIELD_OPTIONS}
               isEditing={isEditing}
               onChange={(r) => updateRangeSafe("yieldRange", r)}
             />
           </Section>
 
-          <Section title="Energieverbrauch">
+          <Section title="Energieverbrauch kWh">
             <RangeSelect
               from={energyConsumptionRange.from ?? null}
               to={energyConsumptionRange.to ?? null}
-              unit="kWh"
+              unit=""
               options={ENERGY_CONSUMPTION_OPTIONS}
               isEditing={isEditing}
               onChange={(r) => updateRangeSafe("energyConsumptionRange", r)}

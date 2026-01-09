@@ -120,15 +120,42 @@ exports.handleStripeWebhook = onRequest(
 
     try {
       switch (event.type) {
+
+        // ------------------------------------------------------------
+        // CHECKOUT ABGESCHLOSSEN (noch KEIN Geld garantiert!)
+        // ------------------------------------------------------------
         case "checkout.session.completed": {
           const uid = obj.metadata?.firebaseUid;
 
           if (uid) {
             await db.collection("users").doc(uid).set(
               {
-                stripeStatus: "paid",
+                stripeStatus: "pending",
                 stripeCustomerId: obj.customer,
                 stripeSubscriptionId: obj.subscription,
+              },
+              { merge: true }
+            );
+          }
+          break;
+        }
+
+        // ------------------------------------------------------------
+        // ZAHLUNG ERFOLGREICH (DAS ist dein "PAID")
+        // ------------------------------------------------------------
+        case "invoice.payment_succeeded": {
+          const customerId = obj.customer;
+
+          const snap = await db
+            .collection("users")
+            .where("stripeCustomerId", "==", customerId)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            await snap.docs[0].ref.set(
+              {
+                stripeStatus: "paid",
                 stripeLastPayment: new Date().toISOString(),
               },
               { merge: true }
@@ -137,6 +164,56 @@ exports.handleStripeWebhook = onRequest(
           break;
         }
 
+        // ------------------------------------------------------------
+        // ZAHLUNG FEHLGESCHLAGEN
+        // ------------------------------------------------------------
+        case "invoice.payment_failed": {
+          const customerId = obj.customer;
+
+          const snap = await db
+            .collection("users")
+            .where("stripeCustomerId", "==", customerId)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            await snap.docs[0].ref.set(
+              {
+                stripeStatus: "payment_failed",
+                stripeLastPaymentError:
+                  obj.last_payment_error?.message || "Zahlung fehlgeschlagen",
+              },
+              { merge: true }
+            );
+          }
+          break;
+        }
+
+        // ------------------------------------------------------------
+        // ABO STATUS ÄNDERT SICH (past_due, unpaid, active)
+        // ------------------------------------------------------------
+        case "customer.subscription.updated": {
+          const customerId = obj.customer;
+          const status = obj.status; // active | past_due | unpaid | canceled
+
+          const snap = await db
+            .collection("users")
+            .where("stripeCustomerId", "==", customerId)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            await snap.docs[0].ref.set(
+              { stripeSubscriptionStatus: status },
+              { merge: true }
+            );
+          }
+          break;
+        }
+
+        // ------------------------------------------------------------
+        // ABO GEKÜNDIGT / BEENDET
+        // ------------------------------------------------------------
         case "customer.subscription.deleted": {
           const customerId = obj.customer;
 
@@ -155,6 +232,9 @@ exports.handleStripeWebhook = onRequest(
           break;
         }
 
+        // ------------------------------------------------------------
+        // ALLES ANDERE IGNORIEREN
+        // ------------------------------------------------------------
         default:
           console.log("ℹ️ Ignored event:", event.type);
       }

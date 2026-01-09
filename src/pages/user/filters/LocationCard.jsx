@@ -4,15 +4,18 @@ import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
 import FilterFrame from "./FilterFrame";
 
+// ✅ Key sicher laden
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
-const RADIUS_OPTIONS = [5, 10, 15, 20, 30, 50];
+const RADIUS_OPTIONS = [5, 7.5, 10, 12.5, 15];
 
 export default function LocationCard({ filters }) {
   const { user } = useAuth();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [address, setAddress] = useState("");
+  
+  // ✅ Adresse initial aus den Filtern laden, falls vorhanden
+  const [address, setAddress] = useState(filters?.address || "");
   const [suggestions, setSuggestions] = useState([]);
 
   const [lat, setLat] = useState(filters?.coordinate?.lat ?? 52.52);
@@ -29,9 +32,13 @@ export default function LocationCard({ filters }) {
     if (filters.coordinate?.lat != null) setLat(filters.coordinate.lat);
     if (filters.coordinate?.lon != null) setLon(filters.coordinate.lon);
     if (filters.radiusInKm != null) setRadius(filters.radiusInKm);
+    
+    // ✅ Wenn eine Adresse gespeichert war, diese wieder ins Feld schreiben
+    if (filters.address) setAddress(filters.address);
   }, [filters]);
 
   const enterEdit = () => setIsEditing(true);
+
   const finishEdit = async () => {
     if (user?.uid) {
       await updateDoc(doc(db, "users", user.uid), {
@@ -39,6 +46,7 @@ export default function LocationCard({ filters }) {
           ...(filters || {}),
           coordinate: { lat, lon },
           radiusInKm: radius,
+          address: address, // ✅ Adresse als String mitspeichern (Wunsch von Christoph)
         },
       });
     }
@@ -53,27 +61,32 @@ export default function LocationCard({ filters }) {
       return;
     }
 
-    const res = await fetch(
-      `https://api.maptiler.com/geocoding/${encodeURIComponent(
-        q
-      )}.json?key=${MAPTILER_KEY}&language=de`
-    );
-    const data = await res.json();
+    // ✅ Filter auf DE, AT, CH setzen (&country=de,at,ch)
+    try {
+      const res = await fetch(
+        `https://api.maptiler.com/geocoding/${encodeURIComponent(
+          q
+        )}.json?key=${MAPTILER_KEY}&language=de&country=de,at,ch`
+      );
+      const data = await res.json();
 
-    setSuggestions(
-      data.features?.map((f) => ({
-        label: f.place_name,
-        lat: f.center[1],
-        lon: f.center[0],
-      })) ?? []
-    );
+      setSuggestions(
+        data.features?.map((f) => ({
+          label: f.place_name,
+          lat: f.center[1],
+          lon: f.center[0],
+        })) ?? []
+      );
+    } catch (error) {
+      console.error("Fehler bei der Adresssuche:", error);
+    }
   }
 
   function selectAddress(s) {
     setAddress(s.label);
     setLat(s.lat);
     setLon(s.lon);
-    setSuggestions([]);
+    setSuggestions([]); // Dropdown schließen
   }
 
   /* ---------------- Map ---------------- */
@@ -86,13 +99,11 @@ export default function LocationCard({ filters }) {
         await new Promise((resolve) => {
           const link = document.createElement("link");
           link.rel = "stylesheet";
-          link.href =
-            "https://unpkg.com/leaflet@1.9.3/dist/leaflet.css";
+          link.href = "https://unpkg.com/leaflet@1.9.3/dist/leaflet.css";
           document.head.appendChild(link);
 
           const script = document.createElement("script");
-          script.src =
-            "https://unpkg.com/leaflet@1.9.3/dist/leaflet.js";
+          script.src = "https://unpkg.com/leaflet@1.9.3/dist/leaflet.js";
           script.onload = resolve;
           document.body.appendChild(script);
         });
@@ -111,8 +122,12 @@ export default function LocationCard({ filters }) {
         }).setView([lat, lon], 11);
 
         L.tileLayer(
-          `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`
+          `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
+          { attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>' }
         ).addTo(leafletRef.current.map);
+      } else {
+        // Karte zentrieren bei Änderung
+        leafletRef.current.map.setView([lat, lon]);
       }
 
       leafletRef.current.marker?.remove();
@@ -139,7 +154,7 @@ export default function LocationCard({ filters }) {
     };
   }, [lat, lon, radius]);
 
-  /* ---------------- Chip Style (identisch zu ObjectCard) ---------------- */
+  /* ---------------- Chip Style ---------------- */
 
   const chipClass = (active) => {
     const base =
@@ -165,6 +180,12 @@ export default function LocationCard({ filters }) {
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">
               Standort & Radius
             </h2>
+            {/* Kleine Anzeige der Adresse auch wenn nicht im Edit-Modus */}
+            {!isEditing && address && (
+               <p className="text-sm text-gray-500 mt-1 truncate max-w-[200px]">
+                 {address}
+               </p>
+            )}
 
             {!isEditing && (
               <button
@@ -211,10 +232,10 @@ export default function LocationCard({ filters }) {
         <div className="space-y-8">
           {/* Edit-Felder */}
           {isEditing && (
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
               <div className="relative">
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">
-                  Adresse suchen
+                  Adresse suchen 
                 </label>
                 <input
                   value={address}
@@ -226,13 +247,14 @@ export default function LocationCard({ filters }) {
                   placeholder="z.B. Berlin Alexanderplatz"
                 />
 
+                {/* ✅ Dropdown mit sehr hohem Z-Index damit es über der Map liegt */}
                 {suggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 mt-1 rounded-xl border bg-white shadow-xl z-50 max-h-40 overflow-auto">
+                  <div className="absolute left-0 right-0 top-full mt-1 rounded-xl border bg-white shadow-2xl z-[1000] max-h-60 overflow-auto">
                     {suggestions.map((s, i) => (
                       <button
                         key={i}
                         onClick={() => selectAddress(s)}
-                        className="block w-full text-left px-4 py-3 text-sm hover:bg-blue-50 border-b last:border-0"
+                        className="block w-full text-left px-4 py-3 text-sm hover:bg-blue-50 border-b last:border-0 text-gray-700"
                       >
                         {s.label}
                       </button>
@@ -263,17 +285,18 @@ export default function LocationCard({ filters }) {
           )}
 
           {/* Map */}
-          <div className="h-64 w-full rounded-2xl border border-gray-200 overflow-hidden">
+          {/* Z-Index 0 stellen, damit das Dropdown (z-1000) drüber geht */}
+          <div className="h-64 w-full rounded-2xl border border-gray-200 overflow-hidden relative z-0">
             <div ref={mapRef} className="h-full w-full bg-gray-100" />
           </div>
         </div>
 
-        {/* Click-anywhere Overlay – GENAU wie ObjectCard */}
+        {/* Click-anywhere Overlay */}
         {!isEditing && (
           <button
             type="button"
             onClick={enterEdit}
-            className="absolute inset-0 rounded-xl cursor-pointer bg-transparent"
+            className="absolute inset-0 rounded-xl cursor-pointer bg-transparent z-10"
             aria-label="Bearbeiten aktivieren"
           />
         )}
