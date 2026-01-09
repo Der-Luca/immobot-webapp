@@ -28,7 +28,7 @@ export default function PaymentOverlay({
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-600 mb-1">
               Monatlich
             </p>
-            <p className="text-2xl font-semibold text-slate-900">6,99 €</p>
+            <p className="text-2xl font-semibold text-slate-900">12,99 €</p>
             <p className="text-sm text-slate-500">
               pro Monat, jederzeit kündbar
             </p>

@@ -3,6 +3,7 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase";
 import usePaymentStatus from "./usePaymentStatus";
 import PaymentOverlay from "./PaymentOverlay";
+import ReactivateOverlay from "./ReactivateOverlay";
 
 // 🔑 Monats-Preis aus ENV (Test / Live)
 const PRICE_MONTHLY = import.meta.env.VITE_STRIPE_PRICE_MONTHLY;
@@ -94,16 +95,33 @@ export default function RequirePayment({ children }) {
     );
   }
 
-  // 🆓 Kein aktives Abo
-  if (isFree || isCancelled || !isPaid) {
-    return (
-      <PaymentOverlay
-        loading={checkingOut}
-        error={error}
-        onSelectMonthly={startCheckout}
-      />
-    );
-  }
+
+ // 🆓 User hatte noch nie ein Abo
+if (isFree) {
+  return (
+    <PaymentOverlay
+      loading={checkingOut}
+      error={error}
+      onSelectMonthly={startCheckout}
+    />
+  );
+}
+
+// 🔁 Abo wurde gekündigt → Reaktivieren
+if (isCancelled) {
+  return (
+    <ReactivateOverlay
+      loading={checkingOut}
+      onReactivate={startCheckout}
+    />
+  );
+}
+
+// ❌ Fallback: kein Zugriff
+if (!isPaid) {
+  return null;
+}
+
 
   // ✅ Zugriff erlaubt
   return children;
