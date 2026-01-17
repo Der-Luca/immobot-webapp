@@ -9,3 +9,7 @@ export function setRadiusInKm(r) {
   const n = Number(r);
   return setState({ radiusInKm: Number.isFinite(n) ? n : 10 });
 }
+
+export function setAddress(address) {
+  return setState({ address });
+}

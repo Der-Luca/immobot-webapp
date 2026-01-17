@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getState, setState } from "./storage/index";
+import { getState } from "./storage/index";
 import { toggleObjectClass } from "./storage/step1";
 
-/* ---------------- Objektarten (UI bleibt gleich) ---------------- */
+/* ---------------- Objektarten ---------------- */
 
 const CLASS_OPTIONS = [
   { label: "Haus", value: "Haus" },
@@ -21,92 +21,32 @@ const CLASS_OPTIONS = [
   { label: "Studentenwohnungen", value: "Studenten" },
 ];
 
-/* ---------------- Mapping: Class → Category ---------------- */
-
-const CLASS_TO_CATEGORY = {
-  // Wohnen
-  Haus: "Wohnen",
-  Wohnung: "Wohnen",
-  Studenten: "Wohnen",
-  Ferienobjekt: "Wohnen",
-
-  // Grundstück
-  Grundstueck: "Wohnen",
-
-  // Gewerbe
-  StellplatzGarage: "Gewerbe",
-  BüroPraxis: "Gewerbe",
-  Gastronomie: "Gewerbe",
-  Gewerbeeinheit: "Gewerbe",
-  HalleLagerProduktion: "Gewerbe",
-  Hotel: "Gewerbe",
-  LandForst: "Gewerbe",
-
-  // Fallback
-  Sonstige: "Wohnen",
-};
-
-/* ---------------- Helper ---------------- */
-
-function deriveObjectCategories(objectClasses = []) {
-  const set = new Set();
-
-  objectClasses.forEach((cls) => {
-    const cat = CLASS_TO_CATEGORY[cls];
-    if (cat) set.add(cat);
-  });
-
-  return Array.from(set);
-}
-
-/* ---------------- Component ---------------- */
-
 export default function Step1() {
   const nav = useNavigate();
-  const initial = useMemo(() => getState(), []);
+
+ 
+  const [filters, setFilters] = useState(() => getState());
+
+  const selectedClasses = filters.objectClasses || [];
 
   const initialTop =
-    initial.offerTypes?.includes("Miete")
+    filters.offerTypes?.includes("Miete")
       ? "Miete"
-      : initial.offerTypes?.includes("Kauf")
+      : filters.offerTypes?.includes("Kauf")
       ? "Kauf"
       : null;
 
   const [selectedTop, setSelectedTop] = useState(initialTop);
-  const [selectedClasses, setSelectedClasses] = useState(
-    initial.objectClasses || []
-  );
 
   function selectTop(mode) {
     setSelectedTop(mode);
-
-    if (mode === "Kauf") {
-      setState({ offerTypes: ["Kauf"], constructionStatus: undefined });
-    } else if (mode === "Miete") {
-      setState({ offerTypes: ["Miete"], constructionStatus: undefined });
-    }
+    setFilters(getState()); // sync UI
   }
 
-  const onToggleClass = (val) => {
-    const active = selectedClasses.includes(val);
-    if (!active && selectedClasses.length >= 2) return;
-
-    const nextClasses = active
-      ? selectedClasses.filter((v) => v !== val)
-      : [...selectedClasses, val];
-
-    setSelectedClasses(nextClasses);
-
-    // 🔥 ZENTRALER FIX
-    const nextCategories = deriveObjectCategories(nextClasses);
-
-    setState({
-      objectClasses: nextClasses,
-      objectCategories: nextCategories,
-    });
-
+  function onToggleClass(val) {
     toggleObjectClass(val);
-  };
+    setFilters(getState()); // 🔁 UI neu aus Storage lesen
+  }
 
   return (
     <div className="
@@ -124,40 +64,30 @@ export default function Step1() {
           Angebotsart
         </p>
 
-        <div className="mx-auto max-w-md">
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            {[
-              { key: "Kauf", label: "Kauf" },
-              { key: "Miete", label: "Miete" },
-            ].map((b) => (
-              <button
-                key={b.key}
-                type="button"
-                onClick={() => selectTop(b.key)}
-                className={`px-4 py-2 rounded-full border text-sm transition min-w-[80px]
-                  ${
-                    selectedTop === b.key
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
-                  }`}
-              >
-                {b.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex justify-center gap-2">
+          {["Kauf", "Miete"].map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => selectTop(mode)}
+              className={`px-4 py-2 rounded-full border text-sm transition
+                ${
+                  selectedTop === mode
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+                }`}
+            >
+              {mode}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Objektarten */}
       <div className="space-y-3">
-        <div>
-          <p className="block text-sm font-medium mb-1 text-center">
-            Objektart
-          </p>
-          <p className="text-center text-xs md:text-sm text-gray-600">
-            Wähle bis zu zwei Stück aus:
-          </p>
-        </div>
+        <p className="block text-sm font-medium text-center">
+          Objektart (max. 2)
+        </p>
 
         <div className="flex flex-wrap gap-2 justify-center">
           {CLASS_OPTIONS.map((opt) => {
@@ -170,7 +100,7 @@ export default function Step1() {
                 type="button"
                 disabled={disabled}
                 onClick={() => onToggleClass(opt.value)}
-                className={`px-3 py-2 md:px-4 md:py-2 rounded-full border text-xs md:text-sm transition
+                className={`px-3 py-2 rounded-full border text-xs md:text-sm transition
                   ${
                     active
                       ? "bg-blue-600 text-white border-blue-600"
@@ -190,8 +120,8 @@ export default function Step1() {
       <div className="flex justify-center mt-6">
         <button
           type="button"
-          className="w-full sm:w-auto px-8 py-3 rounded-xl bg-blue-900 text-white font-medium shadow-sm active:scale-95 transition-transform"
           onClick={() => nav("/register/step2")}
+          className="px-8 py-3 rounded-xl bg-blue-900 text-white font-medium"
         >
           Schritt 2 &gt;
         </button>

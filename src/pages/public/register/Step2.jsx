@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getState } from "./storage/index.js";
-import { setCoordinate, setRadiusInKm } from "./storage/step2.js";
+import { setCoordinate, setRadiusInKm, setAddress} from "./storage/step2.js";
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 const RADIUS_PRESETS = [5, 7.5, 10, 12.5, 15];
@@ -9,12 +9,13 @@ const RADIUS_PRESETS = [5, 7.5, 10, 12.5, 15];
 export default function Step2() {
   const navigate = useNavigate();
   const initial = useMemo(() => getState(), []);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initial.address || "");
   const [suggestions, setSuggestions] = useState([]);
   const [radius, setRadius] = useState(initial.radiusInKm ?? 10);
-
   const mapRef = useRef(null);
   const leafletRef = useRef({ L: null, map: null, marker: null, circle: null });
+  const [hasUserTyped, setHasUserTyped] = useState(false);
+
 
   // Leaflet initialisieren – ohne Geolocation, ohne Drag, ohne Zoom
   useEffect(() => {
@@ -120,7 +121,7 @@ export default function Step2() {
   function onPickSuggestion(item) {
     setQuery(item.label);
     setSuggestions([]);
-
+    setAddress(item.label);
     setCoordinate({ lat: item.lat, lon: item.lon });
     drawMarkerAndCircle(item.lat, item.lon, radius);
   }
@@ -166,7 +167,7 @@ export default function Step2() {
 
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setHasUserTyped(true); }}
           placeholder="z. B. Freiburg im Breisgau"
           // Py-3 für Mobile macht das Tippen einfacher
           className="w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"

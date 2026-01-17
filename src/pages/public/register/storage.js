@@ -9,6 +9,7 @@ const DEFAULTS = {
   objectClasses: [], // z. B. ["Wohnung","Haus"] (max 2 in der UI)
   constructionStatus: [], // wenn Bauprojekt aktiv -> ["InPlanung","ImBauInSanierung"]
   searchString: "", // wenn Zwangsversteigerung aktiv -> "Zwangsversteigerung"
+   address: "", // nur lokal, nicht in Geomap-Payload
 };
 
 /**
