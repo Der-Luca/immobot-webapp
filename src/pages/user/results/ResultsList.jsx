@@ -73,8 +73,8 @@ export default function ResultsList({ offers = [], highlightedId }) {
         <div className="space-y-4">
            <div className="flex items-center gap-2 px-1">
              <span className="relative flex h-2 w-2">
-               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-               <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+               <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
              </span>
              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                Neu eingetroffen
@@ -98,7 +98,7 @@ export default function ResultsList({ offers = [], highlightedId }) {
         <div className="space-y-4 pt-2">
           <button
             onClick={() => setShowOlder(!showOlder)}
-            className="flex items-center justify-between w-full text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors py-2 group"
+            className="flex items-center justify-between w-full text-sm font-bold text-gray-500 hover:text-blue-600 transition-colors py-2 group"
           >
             <div className="flex items-center gap-2">
               <span>{showOlder ? "Ältere verbergen" : "Ältere anzeigen"}</span>
@@ -149,8 +149,8 @@ function ResultItem({ o, user, isActive, setRef }) {
         rounded-2xl p-5 transition-all duration-200
         ${
           isActive
-            ? "border-2 border-indigo-500 bg-indigo-50 shadow-lg scale-[1.02]"
-            : "border border-gray-200 bg-white hover:border-indigo-200 hover:shadow-md"
+            ? "border-2 border-blue-500 bg-blue-50 shadow-lg scale-[1.02]"
+            : "border border-gray-200 bg-white hover:border-blue-200 hover:shadow-md"
         }
       `}
     >
@@ -177,7 +177,7 @@ function ResultItem({ o, user, isActive, setRef }) {
                 source: "web-app",
               })
             }
-            className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors"
+            className="mt-2 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors"
           >
             Zum Angebot
           </button>

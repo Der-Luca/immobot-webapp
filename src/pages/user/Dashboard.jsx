@@ -108,7 +108,7 @@ export default function Dashboard() {
           <motion.div variants={itemVariants} className="space-y-1">
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
               {greeting}, <br className="md:hidden" />
-              <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-600">
+              <span className="text-transparent bg-clip-text bg-blue-600">
                 {firstName}
               </span>
               <motion.span
@@ -175,7 +175,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-start z-10">
                   <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-100">
                     <svg
-                      className="w-6 h-6 text-indigo-600"
+                      className="w-6 h-6 text-blue-600"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -188,9 +188,7 @@ export default function Dashboard() {
                       />
                     </svg>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
-                    Live Suche
-                  </span>
+                 
                 </div>
 
                 <div className="space-y-2 mt-8 z-10">
@@ -201,7 +199,7 @@ export default function Dashboard() {
                   </p>
                 </div>
 
-                <div className="mt-8 flex items-center text-sm font-bold text-indigo-600 group-hover:text-indigo-700 transition-colors z-10">
+                <div className="mt-8 flex items-center text-sm font-bold text-blue-600 group-hover:text-blue-700 transition-colors z-10">
                   Ergebnisse öffnen <ArrowRight />
                 </div>
               </div>

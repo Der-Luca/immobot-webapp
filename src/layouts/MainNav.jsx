@@ -7,7 +7,6 @@ export default function MainNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // ✅ HOOKS IMMER ZUERST
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -19,7 +18,6 @@ export default function MainNav() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ✅ ERST DANACH RETURN-LOGIK
   if (!ready) return null;
   if (!user) return null;
 
@@ -35,10 +33,15 @@ export default function MainNav() {
           {/* LINKER BEREICH */}
           <div className="flex items-center gap-8">
             <Link to="/dashboard" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:bg-indigo-700 transition">
-                I
-              </div>
-              <span className="text-xl font-bold text-gray-900 tracking-tight">
+              {/* Logo aus /public */}
+              <img
+                src="/logo.png"
+                alt="Immobot"
+                className="w-8 h-8 rounded-lg object-contain "
+              />
+
+              {/* Immobot jetzt blau */}
+              <span className="text-xl font-bold text-[#0A4EB2] tracking-tight">
                 Immobot
               </span>
             </Link>
@@ -46,7 +49,7 @@ export default function MainNav() {
             <div className="hidden md:flex items-center gap-6">
               <NavLink to="/dashboard">Dashboard</NavLink>
               {isAdmin && (
-                <NavLink to="/admin" activeColor="text-indigo-600">
+                <NavLink to="/admin" activeColor="text-blue-600">
                   Admin
                 </NavLink>
               )}
@@ -57,7 +60,7 @@ export default function MainNav() {
           <div className="relative ml-auto" ref={menuRef}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center gap-3 p-1 rounded-full hover:bg-gray-100 transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="flex items-center gap-3 p-1 rounded-full hover:bg-gray-100 transition focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <div className="hidden sm:block text-right mr-1">
                 <p className="text-sm font-medium text-gray-700 leading-none">
@@ -68,7 +71,7 @@ export default function MainNav() {
                 </p>
               </div>
 
-              <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white">
+              <div className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white">
                 {initial}
               </div>
             </button>
@@ -87,7 +90,7 @@ export default function MainNav() {
                 <Link
                   to="/dashboard/profile"
                   onClick={() => setIsMenuOpen(false)}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
                 >
                   Mein Profil
                 </Link>
@@ -96,7 +99,7 @@ export default function MainNav() {
                   <Link
                     to="/admin"
                     onClick={() => setIsMenuOpen(false)}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 md:hidden"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 md:hidden"
                   >
                     Admin Bereich
                   </Link>

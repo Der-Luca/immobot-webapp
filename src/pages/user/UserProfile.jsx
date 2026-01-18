@@ -204,14 +204,14 @@ export default function UserProfile() {
                 </h2>
                 <button
                   onClick={() => setEditOpen(!editOpen)}
-                  className="text-indigo-600 text-sm font-medium hover:underline"
+                  className="text-blue-600 text-sm font-medium hover:underline"
                 >
                   {editOpen ? "Schließen" : "Bearbeiten"}
                 </button>
               </div>
 
               <div className="flex gap-8">
-                <div className="h-24 w-24 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg">
+                <div className="h-24 w-24 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg">
                   {initial}
                 </div>
 
@@ -256,7 +256,7 @@ export default function UserProfile() {
                           <button
                             onClick={updateEmail}
                             disabled={updatingEmail}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold disabled:opacity-60"
+                            className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60"
                           >
                             {updatingEmail ? "Speichern…" : "E-Mail speichern"}
                           </button>
