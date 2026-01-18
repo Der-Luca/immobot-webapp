@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getState } from "./storage/index.js";
-import { setCoordinate, setRadiusInKm, setAddress} from "./storage/step2.js";
+import { setCoordinate, setRadiusInKm, setAddress } from "./storage/step2.js";
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 const RADIUS_PRESETS = [5, 7.5, 10, 12.5, 15];
@@ -9,20 +9,23 @@ const RADIUS_PRESETS = [5, 7.5, 10, 12.5, 15];
 export default function Step2() {
   const navigate = useNavigate();
   const initial = useMemo(() => getState(), []);
+
   const [query, setQuery] = useState(initial.address || "");
   const [suggestions, setSuggestions] = useState([]);
   const [radius, setRadius] = useState(initial.radiusInKm ?? 10);
-  const mapRef = useRef(null);
-  const leafletRef = useRef({ L: null, map: null, marker: null, circle: null });
+
   const [hasUserTyped, setHasUserTyped] = useState(false);
 
+  const mapRef = useRef(null);
+  const leafletRef = useRef({ L: null, map: null, marker: null, circle: null });
 
-  // Leaflet initialisieren – ohne Geolocation, ohne Drag, ohne Zoom
+  // ------------------------------------------------------------
+  // Leaflet initialisieren (statisch, locked)
+  // ------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
 
     const ensureLeaflet = async () => {
-      // CSS einbinden
       if (!document.querySelector("link[data-leaflet]")) {
         const link = document.createElement("link");
         link.rel = "stylesheet";
@@ -31,7 +34,6 @@ export default function Step2() {
         document.head.appendChild(link);
       }
 
-      // JS laden
       if (!window.L) {
         await new Promise((resolve) => {
           const s = document.createElement("script");
@@ -46,6 +48,7 @@ export default function Step2() {
 
     ensureLeaflet().then((L) => {
       if (cancelled || !mapRef.current) return;
+
       leafletRef.current.L = L;
 
       const map = L.map(mapRef.current, {
@@ -55,7 +58,7 @@ export default function Step2() {
         doubleClickZoom: false,
         boxZoom: false,
         touchZoom: false,
-      }).setView([52.52, 13.405], 10); // BERLIN FIX
+      }).setView([52.52, 13.405], 10); // Berlin fallback
 
       leafletRef.current.map = map;
 
@@ -64,9 +67,12 @@ export default function Step2() {
         { attribution: "&copy; MapTiler" }
       ).addTo(map);
 
-      // Wenn zuvor Koordinaten bereits gespeichert waren
       if (initial.coordinate?.lat && initial.coordinate?.lon) {
-        drawMarkerAndCircle(initial.coordinate.lat, initial.coordinate.lon, radius);
+        drawMarkerAndCircle(
+          initial.coordinate.lat,
+          initial.coordinate.lon,
+          radius
+        );
       }
     });
 
@@ -75,18 +81,28 @@ export default function Step2() {
     };
   }, []);
 
-  // Radius aktualisieren
+  // ------------------------------------------------------------
+  // Radius ändern
+  // ------------------------------------------------------------
   useEffect(() => {
     setRadiusInKm(radius);
     const { marker } = leafletRef.current;
+
     if (marker) {
       const p = marker.getLatLng();
       drawMarkerAndCircle(p.lat, p.lng, radius);
     }
   }, [radius]);
 
-  // Autocomplete
+  // ------------------------------------------------------------
+  // AUTOCOMPLETE – NUR wenn User tippt
+  // ------------------------------------------------------------
   useEffect(() => {
+    if (!hasUserTyped) {
+      setSuggestions([]);
+      return;
+    }
+
     if (query.trim().length < 3) {
       setSuggestions([]);
       return;
@@ -100,6 +116,7 @@ export default function Step2() {
       try {
         const res = await fetch(url);
         const data = await res.json();
+
         const items =
           data.features
             ?.map((f) => ({
@@ -107,7 +124,8 @@ export default function Step2() {
               lat: f.center?.[1],
               lon: f.center?.[0],
             }))
-            .filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon)) || [];
+            .filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon)) ||
+          [];
 
         setSuggestions(items);
       } catch {
@@ -116,16 +134,24 @@ export default function Step2() {
     }, 200);
 
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, hasUserTyped]);
 
+  // ------------------------------------------------------------
+  // Auswahl aus Dropdown
+  // ------------------------------------------------------------
   function onPickSuggestion(item) {
     setQuery(item.label);
     setSuggestions([]);
+    setHasUserTyped(false); // 🔑 Dropdown wieder deaktivieren
+
     setAddress(item.label);
     setCoordinate({ lat: item.lat, lon: item.lon });
     drawMarkerAndCircle(item.lat, item.lon, radius);
   }
 
+  // ------------------------------------------------------------
+  // Marker + Radius zeichnen
+  // ------------------------------------------------------------
   function drawMarkerAndCircle(lat, lon, rKm) {
     const { L, map, marker, circle } = leafletRef.current;
     if (!L || !map) return;
@@ -146,30 +172,36 @@ export default function Step2() {
     map.fitBounds(c.getBounds(), { padding: [40, 40] });
   }
 
+  // ------------------------------------------------------------
+  // RENDER
+  // ------------------------------------------------------------
   return (
-    // ÄNDERUNGEN: Mobile -> kein Border, mt-2, p-4. Desktop -> Border, mt-10, p-6.
     <div className="
       w-full mx-auto max-w-2xl bg-white space-y-6 md:space-y-8
       p-4 mt-2
       md:p-6 md:mt-10 md:w-2/3 md:border md:rounded-2xl md:shadow-sm
     ">
-      <p className="text-center text-xs md:text-sm text-gray-500">Schritt 2 von 5</p>
+      <p className="text-center text-xs md:text-sm text-gray-500">
+        Schritt 2 von 5
+      </p>
 
-      <h2 className="text-lg md:text-xl font-semibold text-center leading-tight">
+      <h2 className="text-lg md:text-xl font-semibold text-center">
         Wo sollen wir etwas für dich finden?
       </h2>
 
       {/* Adresse */}
       <div className="mx-auto max-w-md relative w-full">
         <label className="block text-sm font-medium mb-1 text-center">
-          Ort/Stadt eingeben
+          Ort / Stadt eingeben
         </label>
 
         <input
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setHasUserTyped(true); }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setHasUserTyped(true); // 🔑 erst jetzt Autocomplete
+          }}
           placeholder="z. B. Freiburg im Breisgau"
-          // Py-3 für Mobile macht das Tippen einfacher
           className="w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
@@ -203,12 +235,11 @@ export default function Step2() {
               key={km}
               type="button"
               onClick={() => setRadius(km)}
-              className={`px-3 py-2 md:px-4 md:py-2 rounded-full border text-sm transition
-                ${
-                  Number(radius) === km
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
-                }`}
+              className={`px-3 py-2 md:px-4 rounded-full border text-sm transition ${
+                Number(radius) === km
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+              }`}
             >
               {km} km
             </button>
@@ -216,28 +247,25 @@ export default function Step2() {
         </div>
       </div>
 
-      {/* Karte — locked */}
-      {/* Container mit Tailwind Klassen für Höhe (h-64 mobile, h-96 desktop) */}
-      <div 
-        className="w-full h-64 md:h-[400px] rounded-xl border border-gray-300 relative overflow-hidden"
-        style={{ pointerEvents: "none" }} // Interaktion weiterhin deaktiviert
+      {/* Karte */}
+      <div
+        className="w-full h-64 md:h-[400px] rounded-xl border border-gray-300 overflow-hidden"
+        style={{ pointerEvents: "none" }}
       >
         <div ref={mapRef} className="w-full h-full" />
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between gap-4 mt-4">
+      <div className="flex justify-between gap-4">
         <button
-          type="button"
-          className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition"
+          className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
           onClick={() => navigate("/register/step1")}
         >
           &lt; Zurück
         </button>
 
         <button
-          type="button"
-          className="px-8 py-3 rounded-xl bg-blue-900 text-white font-medium shadow-sm hover:bg-blue-800 transition active:scale-95"
+          className="px-8 py-3 rounded-xl bg-blue-900 text-white font-medium hover:bg-blue-800 active:scale-95"
           onClick={() => navigate("/register/step3")}
         >
           Schritt 3 &gt;

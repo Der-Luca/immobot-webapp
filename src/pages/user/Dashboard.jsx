@@ -170,10 +170,10 @@ export default function Dashboard() {
             <DashboardCard to="/dashboard/results" variant="light">
               <div className="flex flex-col h-full justify-between relative overflow-hidden">
                 {/* Deko Blob */}
-                <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-50 pointer-events-none mix-blend-multiply" />
+                <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-50 rounded-full blur-3xl opacity-50 pointer-events-none mix-blend-multiply" />
 
                 <div className="flex justify-between items-start z-10">
-                  <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-100">
+                  <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100">
                     <svg
                       className="w-6 h-6 text-blue-600"
                       fill="none"
@@ -231,13 +231,13 @@ function DashboardCard({ children, to, variant }) {
           ${
             isDark
               ? "bg-gray-900 border border-gray-800 shadow-2xl shadow-gray-900/20"
-              : "bg-white border border-gray-100 shadow-2xl shadow-indigo-100/50"
+              : "bg-white border border-gray-100 shadow-2xl shadow-blue-100/50"
           }
         `}
       >
         {/* Dark Mode Gradient Overlay */}
         {isDark && (
-          <div className="absolute inset-0 bg-linear-to-br from-indigo-600/20 via-transparent to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="absolute inset-0 bg-linear-to-br from-blue-600/20 via-transparent to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
         )}
         <div className="relative z-10 h-full">{children}</div>
       </Link>
