@@ -177,7 +177,7 @@ export default function Step2() {
         />
 
         {suggestions.length > 0 && (
-          <div className="absolute left-0 right-0 mt-1 rounded-lg border bg-white shadow-lg z-[9999] max-h-60 overflow-y-auto">
+          <div className="absolute left-0 right-0 mt-1 rounded-lg border bg-white shadow-lg z-9999 max-h-60 overflow-y-auto">
             {suggestions.map((s, i) => (
               <div
                 key={i}

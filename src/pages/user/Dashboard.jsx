@@ -108,7 +108,7 @@ export default function Dashboard() {
           <motion.div variants={itemVariants} className="space-y-1">
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
               {greeting}, <br className="md:hidden" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-600">
                 {firstName}
               </span>
               <motion.span
@@ -239,7 +239,7 @@ function DashboardCard({ children, to, variant }) {
       >
         {/* Dark Mode Gradient Overlay */}
         {isDark && (
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-transparent to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="absolute inset-0 bg-linear-to-br from-indigo-600/20 via-transparent to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
         )}
         <div className="relative z-10 h-full">{children}</div>
       </Link>

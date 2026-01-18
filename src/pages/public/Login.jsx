@@ -69,11 +69,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-sky-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-sky-50 via-white to-sky-100 px-4">
       {/* Farbige Blobs im Hintergrund */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-32 -left-24 h-80 w-80 rounded-full bg-sky-300/50 blur-3xl" />
-        <div className="absolute bottom-[-60px] right-[-40px] h-80 w-80 rounded-full bg-indigo-300/50 blur-3xl" />
+        <div className="absolute bottom-[-60px] -right-10 h-80 w-80 rounded-full bg-indigo-300/50 blur-3xl" />
         <div className="absolute top-1/2 -right-24 h-64 w-64 -translate-y-1/2 rounded-full bg-emerald-200/60 blur-3xl" />
       </div>
 

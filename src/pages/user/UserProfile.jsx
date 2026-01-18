@@ -211,7 +211,7 @@ export default function UserProfile() {
               </div>
 
               <div className="flex gap-8">
-                <div className="h-24 w-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg">
+                <div className="h-24 w-24 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg">
                   {initial}
                 </div>
 
