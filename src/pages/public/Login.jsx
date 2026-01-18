@@ -1,6 +1,6 @@
 // src/pages/public/Login.jsx
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../firebase";
 import { useNavigate, Link } from "react-router-dom";
 
@@ -8,12 +8,21 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Reset UI
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState("");
+
   const navigate = useNavigate();
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), pass);
@@ -23,6 +32,39 @@ export default function Login() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openReset = () => {
+    setResetMsg("");
+    setResetEmail(email.trim()); // convenience: übernimmt das Feld, wenn vorhanden
+    setResetOpen(true);
+  };
+
+  const sendReset = async (e) => {
+    e.preventDefault();
+    setResetMsg("");
+    setError("");
+    setNotice("");
+
+    const mail = resetEmail.trim().toLowerCase();
+    if (!mail || !mail.includes("@")) {
+      setResetMsg("Bitte gib eine gültige E-Mail-Adresse ein.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, mail);
+      setResetMsg("Reset-Link wurde versendet. Bitte prüfe dein Postfach.");
+      // optional: nach kurzer Zeit schließen
+      // setTimeout(() => setResetOpen(false), 1200);
+    } catch (err) {
+      console.error(err);
+      // bewusst generisch, damit keine Account-Enumeration möglich ist
+      setResetMsg("Wenn die E-Mail existiert, bekommst du gleich einen Reset-Link.");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -61,6 +103,11 @@ export default function Login() {
                 {error}
               </div>
             )}
+            {notice && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {notice}
+              </div>
+            )}
 
             <div className="space-y-1">
               <label className="block text-sm font-medium text-slate-800">
@@ -92,6 +139,17 @@ export default function Login() {
               />
             </div>
 
+            {/* Passwort vergessen? */}
+            <div className="-mt-1 text-right">
+              <button
+                type="button"
+                onClick={openReset}
+                className="text-xs font-medium text-sky-600 hover:text-sky-500"
+              >
+                Passwort vergessen?
+              </button>
+            </div>
+
             <button
               className="mt-2 w-full rounded-lg bg-sky-600 py-2.5 text-sm font-medium text-white shadow-md shadow-sky-400/40 hover:bg-sky-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
               disabled={loading}
@@ -115,6 +173,76 @@ export default function Login() {
           Mit dem Login akzeptierst du unsere Nutzungsbedingungen & Datenschutzerklärung.
         </p>
       </div>
+
+      {/* Reset Overlay */}
+      {resetOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-white/80 backdrop-blur-md"
+            onClick={() => setResetOpen(false)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl bg-white/95 border border-slate-200 shadow-xl backdrop-blur-sm p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Passwort zurücksetzen
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Wir schicken dir einen Reset-Link per E-Mail.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setResetOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+                aria-label="Schließen"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={sendReset} className="mt-5 space-y-4">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-800">
+                  E-Mail
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  type="email"
+                  placeholder="beispiel@immobot.pro"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              {resetMsg && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {resetMsg}
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setResetOpen(false)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  disabled={resetLoading}
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-sky-400/40 hover:bg-sky-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {resetLoading ? "Sende…" : "Reset-Link senden"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

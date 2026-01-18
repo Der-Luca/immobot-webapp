@@ -6,40 +6,42 @@ import { useAuth } from "../../contexts/AuthContext";
 export default function usePaymentStatus() {
   const { user } = useAuth();
 
-  const [status, setStatus] = useState("loading");
   const [userDoc, setUserDoc] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+  if (!user) return;
 
-    const load = async () => {
-      setLoading(true);
+  let interval;
 
-      const snap = await getDoc(doc(db, "users", user.uid));
-      const data = snap.data() || null;
+  const load = async () => {
+    const snap = await getDoc(doc(db, "users", user.uid));
+    setUserDoc(snap.data() || null);
+    setLoading(false);
+  };
 
-      setUserDoc(data);
+  load();
 
-      // 🔑 KEIN Stripe-Eintrag → Free User
-      if (!data?.stripeStatus) {
-        setStatus("free");
-      } else {
-        setStatus(data.stripeStatus);
-      }
+  // 🔁 solange pending → alle 3 Sekunden neu prüfen
+  if (userDoc?.stripeStatus === "pending") {
+    interval = setInterval(load, 3000);
+  }
 
-      setLoading(false);
-    };
-
-    load();
-  }, [user]);
+  return () => {
+    if (interval) clearInterval(interval);
+  };
+}, [user, userDoc?.stripeStatus]);
 
   // ------------------------------------------------------------
-  // UX-Helfer (das ist der eigentliche Mehrwert)
+  // Stripe States
   // ------------------------------------------------------------
 
   const stripeStatus = userDoc?.stripeStatus;
   const subscriptionStatus = userDoc?.stripeSubscriptionStatus;
+  const stripeCustomerId = userDoc?.stripeCustomerId;
+
+  // 🆓 NIE Kunde gewesen
+  const isFree = !stripeCustomerId;
 
   const isPaid =
     stripeStatus === "paid" &&
@@ -49,7 +51,6 @@ export default function usePaymentStatus() {
   const isPending = stripeStatus === "pending";
   const isPaymentFailed = stripeStatus === "payment_failed";
   const isCancelled = stripeStatus === "cancelled";
-  const isFree = status === "free";
 
   const needsAction =
     isPaymentFailed ||
@@ -57,17 +58,14 @@ export default function usePaymentStatus() {
     subscriptionStatus === "unpaid";
 
   return {
-    // raw
-    status,
     userDoc,
     loading,
 
-    // semantic flags (für UI)
+    // semantic flags
+    isFree,
     isPaid,
     isPending,
-    isPaymentFailed,
     isCancelled,
-    isFree,
     needsAction,
   };
 }

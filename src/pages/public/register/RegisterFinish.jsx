@@ -2,24 +2,25 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "../../../firebase";
+import { auth, db, functions } from "../../../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { saveCurrentFiltersForUser } from "./storage/saveFilters";
+import { httpsCallable } from "firebase/functions";
 
 export default function RegisterFinish() {
   const nav = useNavigate();
 
   const [firstName, setFirst] = useState("");
-  const [lastName,  setLast]  = useState("");
-  const [email,     setEmail] = useState("");
-  const [pw,        setPw]    = useState("");
-  const [pw2,       setPw2]   = useState("");
+  const [lastName, setLast] = useState("");
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
 
-  const [acceptTerms, setAcceptTerms]       = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const [busy, setBusy] = useState(false);
-  const [err,  setErr]  = useState("");
+  const [err, setErr] = useState("");
 
   const canSubmit =
     !busy &&
@@ -55,14 +56,20 @@ export default function RegisterFinish() {
         doc(db, "users", user.uid),
         {
           firstName: firstName.trim(),
-          lastName:  lastName.trim(),
-          email:     email.trim().toLowerCase(),
-          role:           "user",
-          stripeStatus:   "none",
+          lastName: lastName.trim(),
+          email: email.trim().toLowerCase(),
+          role: "user",
+
+          // Stripe defaults (keine "none"-Falle)
+          stripeStatus: null,
           stripeCustomerId: null,
+
+          // Custom Double Opt-In
+          customEmailVerified: false,
+
           marketingOptIn,
           acceptedTermsAt: serverTimestamp(),
-          createdAt:        serverTimestamp(),
+          createdAt: serverTimestamp(),
         },
         { merge: true }
       );
@@ -70,26 +77,33 @@ export default function RegisterFinish() {
       // 3) Filter sichern
       await saveCurrentFiltersForUser(user.uid);
 
-      // 4) Weiter zum Dashboard (Payment-Overlay greift dort)
+      // 4) ✅ Custom Double Opt-In Mail senden (SMTP, gebrandet)
+      // Wichtig: callable funktioniert erst, wenn User eingeloggt ist → ist er nach createUserWithEmailAndPassword
+      const sendVerify = httpsCallable(functions, "sendVerifyEmail");
+      await sendVerify();
+
+      // 5) Weiter zum Dashboard
+      // → dort blockiert dein Guard, bis (customEmailVerified === true) oder auth.emailVerified === true (je nachdem)
       nav("/dashboard");
     } catch (e) {
-      setErr(e.message || "Fehler bei der Registrierung");
+      console.error(e);
+      setErr(e?.message || "Fehler bei der Registrierung");
     } finally {
       setBusy(false);
     }
   }
 
-  // Gemeinsame Input-Klassen für konsistenten Look
-  // text-base verhindert Zoom auf iOS, md:text-sm ist für Desktop
-  const inputClass = "w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none transition";
+  const inputClass =
+    "w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none transition";
 
   return (
-    // CONTAINER: Mobile (kein Border) vs Desktop (Karte)
-    <div className="
+    <div
+      className="
       w-full mx-auto max-w-lg bg-white
       p-4 mt-2
       md:p-8 md:mt-10 md:border md:rounded-2xl md:shadow-sm
-    ">
+    "
+    >
       <h1 className="text-xl md:text-2xl font-semibold text-center leading-tight mb-2">
         Dein Immobot-Konto
       </h1>
@@ -99,7 +113,7 @@ export default function RegisterFinish() {
       </p>
 
       <form onSubmit={onRegister} className="space-y-4">
-        {/* Name Row */}
+        {/* Name */}
         <div className="flex gap-3">
           <div className="w-1/2">
             <input
@@ -153,50 +167,49 @@ export default function RegisterFinish() {
           autoComplete="new-password"
         />
 
+        {/* Checkboxes */}
         <div className="space-y-3 pt-2">
-            <label className="flex items-start gap-3 text-sm cursor-pointer">
+          <label className="flex items-start gap-3 text-sm cursor-pointer">
             <input
-                type="checkbox"
-                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                checked={acceptTerms}
-                onChange={(e) => setAcceptTerms(e.target.checked)}
-                required
+              type="checkbox"
+              className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              required
             />
             <span className="text-gray-700">
-                Ich akzeptiere die{" "}
-                <Link
+              Ich akzeptiere die{" "}
+              <Link
                 to="/terms"
-                className="underline text-blue-600 hover:text-blue-800"
+                className="underline text-blue-600"
                 target="_blank"
-                rel="noreferrer"
-                >
+              >
                 AGB
-                </Link>{" "}
-                und die{" "}
-                <Link
+              </Link>{" "}
+              und die{" "}
+              <Link
                 to="/privacy"
-                className="underline text-blue-600 hover:text-blue-800"
+                className="underline text-blue-600"
                 target="_blank"
-                rel="noreferrer"
-                >
+              >
                 Datenschutzerklärung
-                </Link>
-                .
+              </Link>
+              .
             </span>
-            </label>
+          </label>
 
-            <label className="flex items-start gap-3 text-sm cursor-pointer">
+          <label className="flex items-start gap-3 text-sm cursor-pointer">
             <input
-                type="checkbox"
-                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                checked={marketingOptIn}
-                onChange={(e) => setMarketingOptIn(e.target.checked)}
+              type="checkbox"
+              className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              checked={marketingOptIn}
+              onChange={(e) => setMarketingOptIn(e.target.checked)}
             />
             <span className="text-gray-700">
-                Ich möchte hilfreiche Updates & Angebote per E-Mail erhalten
-                (optional).
+              Ich möchte hilfreiche Updates & Angebote per E-Mail erhalten
+              (optional).
             </span>
-            </label>
+          </label>
         </div>
 
         {err && (

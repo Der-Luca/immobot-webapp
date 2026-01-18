@@ -4,11 +4,14 @@ import { functions } from "../../firebase";
 import usePaymentStatus from "./usePaymentStatus";
 import PaymentOverlay from "./PaymentOverlay";
 import ReactivateOverlay from "./ReactivateOverlay";
+import { useAuth } from "../../contexts/AuthContext"; // 👈 neu
 
-// 🔑 Monats-Preis aus ENV (Test / Live)
+//  Stripe Price ID
 const PRICE_MONTHLY = import.meta.env.VITE_STRIPE_PRICE_MONTHLY;
 
 export default function RequirePayment({ children }) {
+  const { logout } = useAuth(); // 👈 neu
+
   const {
     loading,
     isPaid,
@@ -66,7 +69,7 @@ export default function RequirePayment({ children }) {
     );
   }
 
-  // ❌ Zahlung fehlgeschlagen / past_due
+  //  Zahlung fehlgeschlagen
   if (needsAction) {
     return (
       <div className="fixed inset-0 bg-white/80 backdrop-blur-md flex items-center justify-center z-50 px-4">
@@ -90,39 +93,56 @@ export default function RequirePayment({ children }) {
           >
             Zahlung reparieren
           </button>
+
+          {/* Logout */}
+          <div className="mt-4">
+            <button
+              onClick={logout}
+              className="text-xs text-slate-500 hover:text-slate-700 underline"
+            >
+              Abmelden
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Free User
+  if (isFree) {
+    return (
+      <PaymentOverlay
+        loading={checkingOut}
+        error={error}
+        onSelectMonthly={startCheckout}
+        onLogout={logout} // 👈 neu
+      />
+    );
+  }
 
- // 🆓 User hatte noch nie ein Abo
-if (isFree) {
-  return (
-    <PaymentOverlay
-      loading={checkingOut}
-      error={error}
-      onSelectMonthly={startCheckout}
-    />
-  );
-}
+  //  Gekündigt → Reaktivieren
+  if (isCancelled) {
+    return (
+      <ReactivateOverlay
+        loading={checkingOut}
+        onReactivate={startCheckout}
+        onLogout={logout} // 👈 optional, falls du’s dort auch willst
+      />
+    );
+  }
 
-// 🔁 Abo wurde gekündigt → Reaktivieren
-if (isCancelled) {
-  return (
-    <ReactivateOverlay
-      loading={checkingOut}
-      onReactivate={startCheckout}
-    />
-  );
-}
+  //  Kein aktives Abo
+  if (!isPaid) {
+    return (
+      <PaymentOverlay
+        loading={checkingOut}
+        error={error}
+        onSelectMonthly={startCheckout}
+        onLogout={logout} // 👈 neu
+      />
+    );
+  }
 
-// ❌ Fallback: kein Zugriff
-if (!isPaid) {
-  return null;
-}
-
-
-  // ✅ Zugriff erlaubt
+  // Zugriff erlaubt
   return children;
 }

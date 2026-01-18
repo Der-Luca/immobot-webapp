@@ -4,6 +4,7 @@ export default function PaymentOverlay({
   loading,
   error,
   onSelectMonthly,
+  onLogout, 
 }) {
   return (
     <div className="fixed inset-0 bg-white/80 backdrop-blur-md flex justify-center items-center z-50 px-4">
@@ -29,9 +30,7 @@ export default function PaymentOverlay({
               Monatlich
             </p>
             <p className="text-2xl font-semibold text-slate-900">12,99 €</p>
-            <p className="text-sm text-slate-500">
-              pro Monat, jederzeit kündbar
-            </p>
+            <p className="text-sm text-slate-500">pro Monat, jederzeit kündbar</p>
           </div>
 
           <span className="text-sm font-medium text-sky-600 group-hover:translate-x-0.5 transition">
@@ -40,15 +39,26 @@ export default function PaymentOverlay({
         </button>
 
         {error && (
-          <p className="text-sm text-red-600 text-center mt-4">
-            {error}
-          </p>
+          <p className="text-sm text-red-600 text-center mt-4">{error}</p>
         )}
 
         {loading && (
           <p className="text-xs text-slate-500 text-center mt-3">
             Weiterleitung zu Stripe…
           </p>
+        )}
+
+        {/* Logout */}
+        {typeof onLogout === "function" && (
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="text-xs font-medium text-slate-500 hover:text-slate-700 underline underline-offset-2"
+            >
+              Abmelden
+            </button>
+          </div>
         )}
       </div>
     </div>
