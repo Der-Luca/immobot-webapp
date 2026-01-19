@@ -34,9 +34,21 @@ export default function Step3() {
   const spacePresets = getSpacePresets();
 
   const [priceTo, setPriceTo] = useState(initial.priceRange?.to ?? null);
-  const [spaceValue, setSpaceValue] = useState(
-    initial.propertySpaceRange?.to ?? null
-  );
+ const [spacePreset, setSpacePresetState] = useState(() => {
+  const r = initial.propertySpaceRange;
+  if (!r) return null;
+
+  if (r.from === 0 && r.to != null) {
+    return { type: "max", value: r.to };
+  }
+
+  if (r.from != null && r.to === 9999999) {
+    return { type: "min", value: r.from };
+  }
+
+  return null;
+});
+
 
   const isGrundstueck = initial.objectClasses?.includes("Grundstueck");
   const isMieteOnly =
@@ -117,11 +129,18 @@ export default function Step3() {
           {spacePresets.map((preset, i) => (
             <Chip
               key={i}
-              active={spaceValue === (preset?.value ?? null)}
-              onClick={() => {
-                setSpaceValue(preset?.value ?? null);
-                setSpacePreset(preset);
-              }}
+             active={
+  preset === null
+    ? spacePreset === null
+    : spacePreset?.type === preset.type &&
+      spacePreset?.value === preset.value
+}
+
+             onClick={() => {
+  setSpacePresetState(preset);
+  setSpacePreset(preset);
+}}
+
             >
               {fmtQM(preset)}
             </Chip>

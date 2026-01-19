@@ -69,3 +69,9 @@ export function getGeomapPayload() {
   ].forEach(add);
   return payload;
 }
+
+
+export function setOfferType(type) {
+  if (!["Kauf", "Miete"].includes(type)) return getState();
+  return setState({ offerTypes: [type] });
+}

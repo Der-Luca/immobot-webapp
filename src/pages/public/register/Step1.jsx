@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getState } from "./storage/index";
+import { getState, setOfferType } from "./storage/index";
 import { toggleObjectClass } from "./storage/step1";
 
 /* ---------------- Objektarten ---------------- */
@@ -47,6 +47,12 @@ export default function Step1() {
     toggleObjectClass(val);
     setFilters(getState()); // 🔁 UI neu aus Storage lesen
   }
+
+  function selectTop(mode) {
+  setOfferType(mode);       // ✅ persistiert
+  setSelectedTop(mode);     // UI
+  setFilters(getState());   // UI sync
+}
 
   return (
     <div className="
