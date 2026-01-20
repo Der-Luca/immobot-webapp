@@ -96,7 +96,7 @@ exports.createCheckoutSession = onCall(
 
     await userRef.set(
       {
-        stripeStatus: "pending",
+        stripeStatus: "checkout_started",
         stripeCheckoutSessionId: session.id,
       },
       { merge: true }

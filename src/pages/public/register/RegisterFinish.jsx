@@ -6,6 +6,7 @@ import { auth, db, functions } from "../../../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { saveCurrentFiltersForUser } from "./storage/saveFilters";
 import { httpsCallable } from "firebase/functions";
+const PRICE_MONTHLY = import.meta.env.VITE_STRIPE_PRICE_MONTHLY;
 
 export default function RegisterFinish() {
   const nav = useNavigate();
@@ -59,9 +60,10 @@ export default function RegisterFinish() {
           lastName: lastName.trim(),
           email: email.trim().toLowerCase(),
           role: "user",
+          initialSearch: false,
 
           // Stripe defaults (keine "none"-Falle)
-          stripeStatus: null,
+          stripeStatus: "none",
           stripeCustomerId: null,
 
           // Custom Double Opt-In
@@ -77,14 +79,18 @@ export default function RegisterFinish() {
       // 3) Filter sichern
       await saveCurrentFiltersForUser(user.uid);
 
-      // 4) ✅ Custom Double Opt-In Mail senden (SMTP, gebrandet)
-      // Wichtig: callable funktioniert erst, wenn User eingeloggt ist → ist er nach createUserWithEmailAndPassword
-      const sendVerify = httpsCallable(functions, "sendVerifyEmail");
-      await sendVerify();
+      // 4) ✅ Custom Double Opt-In Mail senden (nicht blockieren)
+const sendVerify = httpsCallable(functions, "sendVerifyEmail");
+sendVerify();
 
-      // 5) Weiter zum Dashboard
-      // → dort blockiert dein Guard, bis (customEmailVerified === true) oder auth.emailVerified === true (je nachdem)
-      nav("/dashboard");
+// 5)  SOFORT Stripe Checkout (bewusst awaiten, weil redirect)
+const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
+const res = await createCheckoutSession({
+  priceId: PRICE_MONTHLY,
+});
+
+window.location.href = res.data.url;
+
     } catch (e) {
       console.error(e);
       setErr(e?.message || "Fehler bei der Registrierung");
@@ -231,6 +237,24 @@ export default function RegisterFinish() {
           später jederzeit kündigen.
         </p>
       </form>
+      {busy && (
+  <div className="fixed inset-0 z-50 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+    <div className="bg-white rounded-2xl shadow-xl border p-6 text-center">
+      <div className="flex justify-center mb-4">
+        <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+      </div>
+
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">
+        Konto wird erstellt
+      </h2>
+
+      <p className="text-sm text-slate-600">
+        Einen kleinen Moment bitte…
+      </p>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

@@ -62,12 +62,26 @@ export default function RequirePayment({ children }) {
   }
 
   if (isPending) {
-    return (
-      <div className="p-6 text-center text-sm text-gray-600">
-        Zahlung wird geprüft…
+  return (
+    <div className="fixed inset-0 bg-white/80 backdrop-blur-md flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl border p-6 max-w-md text-center">
+        <div className="flex justify-center mb-4">
+          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+
+        <h2 className="text-lg font-semibold text-slate-900 mb-2">
+          Zahlung wird bestätigt
+        </h2>
+
+        <p className="text-sm text-slate-600">
+          Wir prüfen gerade deine Zahlung.  
+          Das dauert in der Regel nur ein paar Sekunden.
+        </p>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   //  Zahlung fehlgeschlagen
   if (needsAction) {
