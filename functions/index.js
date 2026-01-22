@@ -430,3 +430,77 @@ exports.verifyEmail = onRequest(
     );
   }
 );
+
+
+
+// ============================================================================
+// TRACK OFFER CLICK (HTTPS onRequest v2)
+// ============================================================================
+exports.trackOfferClick = onRequest(
+  { region: "europe-west1" },
+  async (req, res) => {
+    try {
+      // redirectId kommt als Query-Parameter
+      // z.B. ?redirectId=21KuoRPiAW7Jq8hzYh6C&userId=XYZ
+      const redirectId = req.query.redirectId;
+      const userId = req.query.userId || "unknown";
+
+      if (!redirectId) {
+        return res.status(400).json({
+          error: "Missing redirectId parameter.",
+        });
+      }
+
+      console.log("📥 Incoming click event:", { redirectId, userId });
+
+      // 1. Angebot aus offerRedirects laden
+      const redirectDocRef = db.collection("offerRedirects").doc(redirectId);
+      const redirectDoc = await redirectDocRef.get();
+
+      if (!redirectDoc.exists) {
+        console.error("❌ Redirect not found:", redirectId);
+        return res.status(404).json({
+          error: "Redirect document not found.",
+        });
+      }
+
+      const offerData = redirectDoc.data();
+
+      // Geomap-Offer-ID aus Feld "id" im Angebot
+      const geomapOfferId = offerData.id || null;
+
+      // 2. Klick-Event speichern
+      const clickEvent = {
+        redirectId,                         // Firestore-Dokument-ID aus offerRedirects
+        userId,                             // User, der geklickt hat (aus Query)
+        geomapOfferId,                      // Geomap Offer-ID aus dem Angebot
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        source: req.query.source || "redirect",
+      };
+
+      await db.collection("clickEvents").add(clickEvent);
+
+      console.log(" Click event stored:", clickEvent);
+
+      // 3. User weiterleiten
+      const targetUrl = offerData.redirectUrl;
+
+      if (!targetUrl) {
+        console.error(" redirectUrl missing in offerRedirects doc:", redirectId);
+        return res.status(500).json({
+          error: "redirectUrl missing in offerRedirects doc.",
+        });
+      }
+
+      console.log("➡️ Redirecting user to:", targetUrl);
+      return res.redirect(targetUrl);
+
+    } catch (err) {
+      console.error(" Error in trackOfferClick:", err);
+      return res.status(500).json({
+        error: "Internal server error",
+        details: err.message,
+      });
+    }
+  }
+);

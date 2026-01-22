@@ -4,7 +4,7 @@ import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
 import FilterFrame from "./FilterFrame";
 
-// ✅ Key sicher laden
+
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
 const RADIUS_OPTIONS = [5, 7.5, 10, 12.5, 15];
@@ -14,7 +14,7 @@ export default function LocationCard({ filters }) {
 
   const [isEditing, setIsEditing] = useState(false);
   
-  // ✅ Adresse initial aus den Filtern laden, falls vorhanden
+
   const [address, setAddress] = useState(filters?.address || "");
   const [suggestions, setSuggestions] = useState([]);
 
@@ -33,7 +33,7 @@ export default function LocationCard({ filters }) {
     if (filters.coordinate?.lon != null) setLon(filters.coordinate.lon);
     if (filters.radiusInKm != null) setRadius(filters.radiusInKm);
     
-    // ✅ Wenn eine Adresse gespeichert war, diese wieder ins Feld schreiben
+
     if (filters.address) setAddress(filters.address);
   }, [filters]);
 
@@ -46,14 +46,14 @@ export default function LocationCard({ filters }) {
           ...(filters || {}),
           coordinate: { lat, lon },
           radiusInKm: radius,
-          address: address, // ✅ Adresse als String mitspeichern (Wunsch von Christoph)
+          address: address, 
         },
       });
     }
     setIsEditing(false);
   };
 
-  /* ---------------- Autocomplete ---------------- */
+
 
   async function searchAddress(q) {
     if (!q || q.length < 3) {
@@ -247,7 +247,7 @@ export default function LocationCard({ filters }) {
                   placeholder="z.B. Berlin Alexanderplatz"
                 />
 
-                {/* ✅ Dropdown mit sehr hohem Z-Index damit es über der Map liegt */}
+    
                 {suggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 rounded-xl border bg-white shadow-2xl z-[1000] max-h-60 overflow-auto">
                     {suggestions.map((s, i) => (
@@ -285,7 +285,7 @@ export default function LocationCard({ filters }) {
           )}
 
           {/* Map */}
-          {/* Z-Index 0 stellen, damit das Dropdown (z-1000) drüber geht */}
+     
           <div className="h-64 w-full rounded-2xl border border-gray-200 overflow-hidden relative z-0">
             <div ref={mapRef} className="h-full w-full bg-gray-100" />
           </div>
