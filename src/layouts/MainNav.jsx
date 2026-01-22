@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function MainNav() {
@@ -20,6 +20,10 @@ export default function MainNav() {
 
   if (!ready) return null;
   if (!user) return null;
+ const { pathname } = useLocation();
+
+  // Nav auf Checkout-Redirect nicht anzeigen
+  if (pathname === "/register/checkout-redirect") return null;
 
   const isAdmin = role === "admin";
   const firstName = user?.firstName || user?.email?.split("@")[0] || "U";

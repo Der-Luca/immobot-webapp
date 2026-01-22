@@ -31,9 +31,14 @@ export default function RegisterFinish() {
     email.trim() &&
     pw.trim() &&
     pw2.trim();
+  
 
   async function onRegister(e) {
+    setBusy(true);
     e.preventDefault();
+
+     // 🔒 ONBOARDING-LOCK SOFORT SETZEN
+    sessionStorage.setItem("onboarding_in_progress", "1");
     if (!canSubmit) return;
 
     if (pw !== pw2) {
@@ -41,7 +46,7 @@ export default function RegisterFinish() {
       return;
     }
 
-    setBusy(true);
+  
     setErr("");
 
     try {
@@ -61,7 +66,7 @@ export default function RegisterFinish() {
           email: email.trim().toLowerCase(),
           role: "user",
           initialSearch: false,
-
+          initialMail: false,
           // Stripe defaults (keine "none"-Falle)
           stripeStatus: "none",
           stripeCustomerId: null,
@@ -83,20 +88,20 @@ export default function RegisterFinish() {
 const sendVerify = httpsCallable(functions, "sendVerifyEmail");
 sendVerify();
 
-// 5)  SOFORT Stripe Checkout (bewusst awaiten, weil redirect)
-const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
-const res = await createCheckoutSession({
-  priceId: PRICE_MONTHLY,
-});
 
-window.location.href = res.data.url;
+
+   nav("/register/checkout-redirect", { replace: true });
+
+
+
 
     } catch (e) {
+      setBusy(false);
       console.error(e);
       setErr(e?.message || "Fehler bei der Registrierung");
-    } finally {
-      setBusy(false);
-    }
+    } 
+   
+    
   }
 
   const inputClass =
@@ -237,23 +242,7 @@ window.location.href = res.data.url;
           später jederzeit kündigen.
         </p>
       </form>
-      {busy && (
-  <div className="fixed inset-0 z-50 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-    <div className="bg-white rounded-2xl shadow-xl border p-6 text-center">
-      <div className="flex justify-center mb-4">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
-      </div>
 
-      <h2 className="text-lg font-semibold text-slate-900 mb-1">
-        Konto wird erstellt
-      </h2>
-
-      <p className="text-sm text-slate-600">
-        Einen kleinen Moment bitte…
-      </p>
-    </div>
-  </div>
-)}
 
     </div>
   );

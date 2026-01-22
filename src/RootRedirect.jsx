@@ -1,16 +1,24 @@
 // src/RootRedirect.jsx
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
-
+import LoadingScreen from "./components/LoadingScreen";
 export default function RootRedirect() {
-  const { user, ready } = useAuth();
 
-  // Warten, bis Firebase fertig ist, damit es nicht flackert
-  if (!ready) return null;
+  const { user, ready, stripeStatus } = useAuth();
 
-  // Eingeloggt → Dashboard
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (!ready) {
+    return <LoadingScreen label="Profil wird geladen…" />;
+  }
 
-  // Nicht eingeloggt → Login
-  return <Navigate to="/login" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (stripeStatus === "none") {
+    return <Navigate to="/checkout-redirect" replace />;
+  }
+
+  return <Navigate to="/dashboard" replace />;
+
+
 }
