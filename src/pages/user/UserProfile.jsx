@@ -36,6 +36,10 @@ export default function UserProfile() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
+  // Mail toggle
+  const [allowMail, setAllowMail] = useState(false);
+  const [savingMail, setSavingMail] = useState(false);
+
   // ------------------------------------------------------------------
   // Load profile
   // ------------------------------------------------------------------
@@ -54,6 +58,7 @@ export default function UserProfile() {
           setFirstNameDraft(data?.firstName || "");
           setLastNameDraft(data?.lastName || "");
           setEmailDraft(user?.email || "");
+          setAllowMail(data?.allowMail ?? false);
         }
       } catch (e) {
         console.error(e);
@@ -171,6 +176,23 @@ export default function UserProfile() {
       setError("Stripe-Portal konnte nicht geöffnet werden.");
     } finally {
       setBillingLoading(false);
+    }
+  }
+
+  async function toggleAllowMail() {
+    const newValue = !allowMail;
+    setSavingMail(true);
+    setError("");
+
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        allowMail: newValue,
+      });
+      setAllowMail(newValue);
+    } catch {
+      setError("Einstellung konnte nicht gespeichert werden.");
+    } finally {
+      setSavingMail(false);
     }
   }
 
@@ -304,30 +326,67 @@ export default function UserProfile() {
           </div>
 
           {/* RIGHT */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h2 className="font-bold text-gray-900 mb-4">Mitgliedschaft</h2>
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <h2 className="font-bold text-gray-900 mb-4">Mitgliedschaft</h2>
 
-            <span
-              className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase border ${statusColor}`}
-            >
-              {statusLabel}
-            </span>
+              <span
+                className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase border ${statusColor}`}
+              >
+                {statusLabel}
+              </span>
 
-            <p className="text-sm text-gray-500 mt-4 mb-6">
-              {isPremium
-                ? "Du hast vollen Zugriff auf alle Pro-Funktionen."
-                : needsAction
-                ? "Bitte überprüfe deine Zahlungsmethode."
-                : "Du nutzt aktuell den kostenlosen Basis-Plan."}
-            </p>
+              <p className="text-sm text-gray-500 mt-4 mb-6">
+                {isPremium
+                  ? "Du hast vollen Zugriff auf alle Pro-Funktionen."
+                  : needsAction
+                  ? "Bitte überprüfe deine Zahlungsmethode."
+                  : "Du nutzt aktuell den kostenlosen Basis-Plan."}
+              </p>
 
-            <button
-              onClick={openBillingPortal}
-              disabled={billingLoading}
-              className="w-full py-2.5 rounded-xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-60"
-            >
-              {billingLoading ? "Öffne Portal…" : "Abo verwalten"}
-            </button>
+              <button
+                onClick={openBillingPortal}
+                disabled={billingLoading}
+                className="w-full py-2.5 rounded-xl bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-60"
+              >
+                {billingLoading ? "Öffne Portal…" : "Abo verwalten"}
+              </button>
+            </div>
+
+            {/* E-Mail Benachrichtigungen */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <h2 className="font-bold text-gray-900 mb-4">Benachrichtigungen</h2>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">E-Mail Benachrichtigungen</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Erhalte Updates zu neuen Angeboten per E-Mail
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={toggleAllowMail}
+                  disabled={savingMail}
+                  className={`
+                    relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full
+                    border-2 border-transparent transition-colors duration-200 ease-in-out
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    ${allowMail ? "bg-blue-600" : "bg-gray-200"}
+                  `}
+                >
+                  <span
+                    className={`
+                      pointer-events-none inline-block h-6 w-6 transform rounded-full
+                      bg-white shadow-lg ring-0 transition duration-200 ease-in-out
+                      ${allowMail ? "translate-x-5" : "translate-x-0"}
+                    `}
+                  />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

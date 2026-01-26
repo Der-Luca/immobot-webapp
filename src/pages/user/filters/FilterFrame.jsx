@@ -23,7 +23,7 @@ export default function FilterFrame({ isEditing, header, children }) {
           <div
             className="
               absolute inset-0 rounded-xl
-              bg-white/40 backdrop-blur-[1px]
+             backdrop-blur-[1px]
               pointer-events-none
             "
             aria-hidden="true"

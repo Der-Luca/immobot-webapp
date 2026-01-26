@@ -73,7 +73,7 @@ export default function RegisterFinish() {
 
           // Custom Double Opt-In
           customEmailVerified: false,
-
+          allowMail: true,
           marketingOptIn,
           acceptedTermsAt: serverTimestamp(),
           createdAt: serverTimestamp(),
