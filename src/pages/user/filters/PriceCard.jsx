@@ -12,11 +12,7 @@ function Chip({ active, onClick, children, disabled, isEditing }) {
         type="button"
         disabled={disabled}
         onClick={onClick}
-        className={
-          isEditing
-            ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
-            : `${base} bg-gray-200 border-gray-200 text-gray-700`
-        }
+        className={`${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`}
       >
         {children}
       </button>

@@ -68,9 +68,7 @@ export default function ExtrasCard({ filters }) {
       "px-4 py-2 text-sm rounded-full border transition-all duration-200";
 
     if (active) {
-      return isEditing
-        ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
-        : `${base} bg-gray-200 border-gray-200 text-gray-700`;
+      return `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`;
     }
 
     return isEditing

@@ -88,9 +88,7 @@ function ChipGrid({ options, active = [], onToggle, isEditing }) {
         const base = "px-3 py-1.5 text-xs font-medium rounded-full border transition-all";
 
         const cls = isActive
-          ? isEditing
-            ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
-            : `${base} bg-gray-200 border-gray-200 text-gray-700`
+          ? `${base} bg-blue-600 border-blue-600 text-white hover:bg-blue-700`
           : isEditing
           ? `${base} bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400`
           : `${base} bg-white border-gray-200 text-gray-400`;
