@@ -63,10 +63,10 @@ export default function UserResultsPage() {
   }, [user]);
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 p-6 max-w-[1800px] mx-auto min-h-screen">
+   <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 p-6 max-w-[1800px] mx-auto min-h-screen">
 
       {/* ================= LINKER BEREICH (LISTE) ================= */}
-      <div className="order-2 xl:order-1 flex flex-col gap-6">
+      <div className="order-2 xl:order-1 xl:col-span-1 flex flex-col gap-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
             Deine Ergebnisse
@@ -92,9 +92,9 @@ export default function UserResultsPage() {
       </div>
 
      {/* ================= RECHTER BEREICH (KARTE) ================= */}
-      <div className="order-1 xl:order-2">
+      <div className="order-1 xl:order-2 xl:col-span-2">
         <div className="sticky top-6">
-          <div className="h-[360px] xl:h-[520px] rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+          <div className="h-[520px] xl:h-[740px]rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
             <ResultsMap
               offers={offers}
               onMarkerClick={setHighlightedId}
