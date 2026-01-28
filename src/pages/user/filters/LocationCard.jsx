@@ -44,6 +44,22 @@ export default function LocationCard({ filters, onChange }) {
     setIsEditing(false);
   };
 
+useEffect(() => {
+  const map = leafletRef.current.map;
+  const circle = leafletRef.current.circle;
+
+  if (!map || !circle) return;
+
+
+  setTimeout(() => {
+    map.invalidateSize();
+
+
+    map.fitBounds(circle.getBounds(), {
+      padding: [20, 20],
+    });
+  }, 300); 
+}, [isEditing]);
 
 
   async function searchAddress(q) {
@@ -277,7 +293,11 @@ export default function LocationCard({ filters, onChange }) {
 
           {/* Map */}
      
-          <div className="h-64 w-full rounded-2xl border border-gray-200 overflow-hidden relative z-0">
+         <div
+  className={`w-full rounded-2xl border border-gray-200 overflow-hidden relative z-0 transition-all duration-300 ${
+    isEditing ? "h-64" : "h-[420px] md:h-[480px]"
+  }`}
+>
             <div ref={mapRef} className="h-full w-full bg-gray-100" />
           </div>
         </div>
