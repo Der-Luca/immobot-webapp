@@ -1,7 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
-import { useAuth } from "../../../contexts/AuthContext";
 import FilterFrame from "./FilterFrame";
 
 
@@ -9,11 +6,9 @@ const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
 const RADIUS_OPTIONS = [5, 7.5, 10, 12.5, 15];
 
-export default function LocationCard({ filters }) {
-  const { user } = useAuth();
-
+export default function LocationCard({ filters, onChange }) {
   const [isEditing, setIsEditing] = useState(false);
-  
+
 
   const [address, setAddress] = useState(filters?.address || "");
   const [suggestions, setSuggestions] = useState([]);
@@ -39,17 +34,13 @@ export default function LocationCard({ filters }) {
 
   const enterEdit = () => setIsEditing(true);
 
-  const finishEdit = async () => {
-    if (user?.uid) {
-      await updateDoc(doc(db, "users", user.uid), {
-        lastSearch: {
-          ...(filters || {}),
-          coordinate: { lat, lon },
-          radiusInKm: radius,
-          address: address, 
-        },
-      });
-    }
+  const finishEdit = () => {
+    onChange({
+      ...filters,
+      coordinate: { lat, lon },
+      radiusInKm: radius,
+      address: address,
+    });
     setIsEditing(false);
   };
 
