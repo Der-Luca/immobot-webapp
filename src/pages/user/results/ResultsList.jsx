@@ -26,7 +26,7 @@ const formatPrice = (price) => {
   }).format(num);
 };
 
-export default function ResultsList({ offers = [], highlightedId }) {
+export default function ResultsList({ offers = [], highlightedId, onItemClick }) {
   const { user } = useAuth();
   const itemRefs = useRef({});
   
@@ -82,12 +82,13 @@ export default function ResultsList({ offers = [], highlightedId }) {
            </div>
            
            {todayOffers.map((o) => (
-             <ResultItem 
-               key={o.docId} 
-               o={o} 
-               user={user} 
-               isActive={o.docId === highlightedId} 
+             <ResultItem
+               key={o.docId}
+               o={o}
+               user={user}
+               isActive={o.docId === highlightedId}
                setRef={(el) => (itemRefs.current[o.docId] = el)}
+               onItemClick={onItemClick}
              />
            ))}
         </div>
@@ -117,12 +118,13 @@ export default function ResultsList({ offers = [], highlightedId }) {
           {showOlder && (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
               {olderOffers.map((o) => (
-                <ResultItem 
-                  key={o.docId} 
-                  o={o} 
-                  user={user} 
-                  isActive={o.docId === highlightedId} 
+                <ResultItem
+                  key={o.docId}
+                  o={o}
+                  user={user}
+                  isActive={o.docId === highlightedId}
                   setRef={(el) => (itemRefs.current[o.docId] = el)}
+                  onItemClick={onItemClick}
                 />
               ))}
             </div>
@@ -141,12 +143,21 @@ export default function ResultsList({ offers = [], highlightedId }) {
 }
 
 /* --- ITEM COMPONENT (Für sauberen Code) --- */
-function ResultItem({ o, user, isActive, setRef }) {
+function ResultItem({ o, user, isActive, setRef, onItemClick }) {
+  const hasLocation = typeof o.latitude === "number" && typeof o.longitude === "number";
+
+  const handleCardClick = (e) => {
+    // Nicht auslösen wenn der Button geklickt wurde
+    if (e.target.closest("button")) return;
+    onItemClick?.(o.docId, hasLocation);
+  };
+
   return (
     <div
       ref={setRef}
+      onClick={handleCardClick}
       className={`
-        rounded-2xl p-5 transition-all duration-200
+        rounded-2xl p-5 transition-all duration-200 cursor-pointer
         ${
           isActive
             ? "border-2 border-blue-500 bg-blue-50 shadow-lg scale-[1.02]"
@@ -166,7 +177,7 @@ function ResultItem({ o, user, isActive, setRef }) {
 
         <div className="text-right whitespace-nowrap">
           <div className="font-bold text-gray-900">{formatPrice(o.price)}</div>
-          
+
           <button
             onClick={() =>
               trackAndRedirect({

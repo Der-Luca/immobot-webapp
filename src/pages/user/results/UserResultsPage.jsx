@@ -3,7 +3,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import ResultsMap from "./ResultsMap";
-import ResultsList from "./ResultsList"; // <--- DAS HIER IST WICHTIG!
+import ResultsList from "./ResultsList";
 
 export default function UserResultsPage() {
   const { user } = useAuth();
@@ -11,6 +11,19 @@ export default function UserResultsPage() {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [highlightedId, setHighlightedId] = useState(null);
+  const [selectedMapId, setSelectedMapId] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  // Handler wenn Item in der Liste geklickt wird
+  const handleItemClick = (docId, hasLocation) => {
+    if (hasLocation) {
+      setSelectedMapId(docId);
+      setHighlightedId(docId);
+    } else {
+      setToast("Standort nicht öffentlich");
+      setTimeout(() => setToast(null), 2500);
+    }
+  };
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -69,14 +82,11 @@ export default function UserResultsPage() {
           </div>
         )}
 
-        {/* 🔥🔥🔥 HIER IST DER FIX 🔥🔥🔥
-            Wir benutzen jetzt deine neue Komponente. 
-            Vorher stand hier der alte Code direkt drin.
-        */}
         {!loading && (
-          <ResultsList 
-            offers={offers} 
-            highlightedId={highlightedId} 
+          <ResultsList
+            offers={offers}
+            highlightedId={highlightedId}
+            onItemClick={handleItemClick}
           />
         )}
       </div>
@@ -88,8 +98,16 @@ export default function UserResultsPage() {
             <ResultsMap
               offers={offers}
               onMarkerClick={setHighlightedId}
+              selectedId={selectedMapId}
             />
           </div>
+
+          {/* Toast für fehlende Location */}
+          {toast && (
+            <div className="mt-3 px-4 py-3 bg-gray-800 text-white text-sm font-medium rounded-xl text-center animate-in fade-in slide-in-from-bottom-2 duration-200">
+              {toast}
+            </div>
+          )}
         </div>
       </div>
 

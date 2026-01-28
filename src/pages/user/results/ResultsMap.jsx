@@ -4,9 +4,15 @@ import { useEffect, useRef } from "react";
 // Falls du nicht Vite nutzt, sondern Create-React-App, nutze process.env.REACT_APP_MAPTILER_KEY
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
-export default function ResultsMap({ offers = [], onMarkerClick }) {
+export default function ResultsMap({ offers = [], onMarkerClick, selectedId }) {
   const mapRef = useRef(null);
-  const leafletRef = useRef({ map: null, L: null, markers: [] });
+  const leafletRef = useRef({ map: null, L: null, markers: {} });
+  const onMarkerClickRef = useRef(onMarkerClick);
+
+  // Ref immer aktuell halten
+  useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
+  }, [onMarkerClick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,8 +62,8 @@ export default function ResultsMap({ offers = [], onMarkerClick }) {
       if (!map || !L) return;
 
       // alte Marker weg
-      leafletRef.current.markers.forEach((m) => m.remove());
-      leafletRef.current.markers = [];
+      Object.values(leafletRef.current.markers).forEach((m) => m.remove());
+      leafletRef.current.markers = {};
 
       const valid = offers.filter(
         (o) =>
@@ -79,10 +85,10 @@ export default function ResultsMap({ offers = [], onMarkerClick }) {
 
         marker.on("click", () => {
           marker.openPopup();
-          onMarkerClick?.(o.docId);
+          onMarkerClickRef.current?.(o.docId);
         });
 
-        leafletRef.current.markers.push(marker);
+        leafletRef.current.markers[o.docId] = marker;
       });
 
       if (valid.length > 0) {
@@ -95,7 +101,18 @@ export default function ResultsMap({ offers = [], onMarkerClick }) {
 
     init();
     return () => (cancelled = true);
-  }, [offers, onMarkerClick]);
+  }, [offers]);
+
+  // Marker hervorheben wenn von der Liste ausgewählt
+  useEffect(() => {
+    if (!selectedId) return;
+    const marker = leafletRef.current.markers[selectedId];
+    const map = leafletRef.current.map;
+    if (marker && map) {
+      map.setView(marker.getLatLng(), 14, { animate: true });
+      marker.openPopup();
+    }
+  }, [selectedId]);
 
   return (
     <div
