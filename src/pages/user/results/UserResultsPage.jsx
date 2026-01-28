@@ -93,8 +93,8 @@ export default function UserResultsPage() {
 
      {/* ================= RECHTER BEREICH (KARTE) ================= */}
       <div className="order-1 xl:order-2 xl:col-span-2">
-        <div className="sticky top-6">
-          <div className="h-[520px] xl:h-[740px]rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+     <div className="sticky top-6 lg:mt-32">
+       <div className="h-[360px] sm:h-[450px] lg:h-[650px] xl:h-[700px] rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
             <ResultsMap
               offers={offers}
               onMarkerClick={setHighlightedId}
