@@ -88,7 +88,7 @@ export default function Step4() {
           <p className="text-xs sm:text-sm text-gray-600 text-center max-w-xl mx-auto">
             Achtung: Jeder weitere Filter kann die Trefferquote reduzieren.{" "}
             <a
-              href="https://immobot.pro/funktionen/"
+              href="https://immobot.pro#faq"
               target="_blank"
               rel="noreferrer"
               className="underline text-blue-600 hover:text-blue-800"
