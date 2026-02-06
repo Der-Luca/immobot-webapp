@@ -42,7 +42,14 @@ export default function App() {
         {/* Root: hängt von Login-Status ab */}
 
         {/* Login explizit erreichbar */}
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={
+            <PublicOnlyRoute>
+              <Login />
+            </PublicOnlyRoute>
+          }
+        />
 
         {/* Register-Flow */}
        <Route
