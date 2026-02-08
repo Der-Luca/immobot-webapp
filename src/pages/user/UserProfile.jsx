@@ -40,6 +40,20 @@ export default function UserProfile() {
   const [allowMail, setAllowMail] = useState(false);
   const [savingMail, setSavingMail] = useState(false);
 
+  // Billing address
+  const [billingAddress, setBillingAddress] = useState({
+    company: "",
+    firstName: "",
+    lastName: "",
+    street: "",
+    zip: "",
+    city: "",
+    country: "Deutschland",
+  });
+  const [savingBilling, setSavingBilling] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceUrl, setInvoiceUrl] = useState("");
+
   // ------------------------------------------------------------------
   // Load profile
   // ------------------------------------------------------------------
@@ -59,6 +73,9 @@ export default function UserProfile() {
           setLastNameDraft(data?.lastName || "");
           setEmailDraft(user?.email || "");
           setAllowMail(data?.allowMail ?? false);
+          if (data?.billingAddress) {
+            setBillingAddress((prev) => ({ ...prev, ...data.billingAddress }));
+          }
         }
       } catch (e) {
         console.error(e);
@@ -176,6 +193,46 @@ export default function UserProfile() {
       setError("Stripe-Portal konnte nicht geöffnet werden.");
     } finally {
       setBillingLoading(false);
+    }
+  }
+
+  async function saveBillingAddress() {
+    setSavingBilling(true);
+    setError("");
+    setNotice("");
+
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        billingAddress: billingAddress,
+      });
+      setNotice("Rechnungsadresse gespeichert.");
+    } catch {
+      setError("Rechnungsadresse konnte nicht gespeichert werden.");
+    } finally {
+      setSavingBilling(false);
+    }
+  }
+
+  async function createInvoice() {
+    setInvoiceLoading(true);
+    setError("");
+    setNotice("");
+    setInvoiceUrl("");
+
+    try {
+      // Save billing address first
+      await updateDoc(doc(db, "users", user.uid), {
+        billingAddress: billingAddress,
+      });
+
+      const fn = httpsCallable(functions, "createMonthlyInvoice");
+      const res = await fn();
+      setInvoiceUrl(res.data.invoiceUrl);
+      setNotice("Rechnung wurde erstellt!");
+    } catch (e) {
+      setError(e?.message || "Rechnung konnte nicht erstellt werden.");
+    } finally {
+      setInvoiceLoading(false);
     }
   }
 
@@ -316,6 +373,97 @@ export default function UserProfile() {
                 </div>
               </div>
             </div>
+
+            {isPremium && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                <h2 className="font-bold text-gray-900 mb-6">Rechnungsadresse</h2>
+
+                <div className="space-y-4">
+                  <input
+                    value={billingAddress.company}
+                    onChange={(e) => setBillingAddress((p) => ({ ...p, company: e.target.value }))}
+                    placeholder="Firma (optional)"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200"
+                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input
+                      value={billingAddress.firstName}
+                      onChange={(e) => setBillingAddress((p) => ({ ...p, firstName: e.target.value }))}
+                      placeholder="Vorname"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200"
+                    />
+                    <input
+                      value={billingAddress.lastName}
+                      onChange={(e) => setBillingAddress((p) => ({ ...p, lastName: e.target.value }))}
+                      placeholder="Nachname"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200"
+                    />
+                  </div>
+
+                  <input
+                    value={billingAddress.street}
+                    onChange={(e) => setBillingAddress((p) => ({ ...p, street: e.target.value }))}
+                    placeholder="Straße + Hausnummer"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200"
+                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input
+                      value={billingAddress.zip}
+                      onChange={(e) => setBillingAddress((p) => ({ ...p, zip: e.target.value }))}
+                      placeholder="PLZ"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200"
+                    />
+                    <input
+                      value={billingAddress.city}
+                      onChange={(e) => setBillingAddress((p) => ({ ...p, city: e.target.value }))}
+                      placeholder="Stadt"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200"
+                    />
+                  </div>
+
+                  <input
+                    value={billingAddress.country}
+                    onChange={(e) => setBillingAddress((p) => ({ ...p, country: e.target.value }))}
+                    placeholder="Land"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200"
+                  />
+
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    <button
+                      onClick={saveBillingAddress}
+                      disabled={savingBilling}
+                      className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold disabled:opacity-60"
+                    >
+                      {savingBilling ? "Speichere…" : "Adresse speichern"}
+                    </button>
+
+                    <button
+                      onClick={createInvoice}
+                      disabled={invoiceLoading}
+                      className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60"
+                    >
+                      {invoiceLoading ? "Erstelle Rechnung…" : "Rechnung erstellen"}
+                    </button>
+                  </div>
+
+                  {invoiceUrl && (
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm">
+                      <p className="text-emerald-800 font-medium mb-2">Rechnung erstellt!</p>
+                      <a
+                        href={invoiceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline text-sm"
+                      >
+                        PDF herunterladen
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               onClick={logout}

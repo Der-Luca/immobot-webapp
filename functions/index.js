@@ -434,6 +434,91 @@ exports.verifyEmail = onRequest(
 
 
 // ============================================================================
+// CREATE MONTHLY INVOICE
+// ============================================================================
+exports.createMonthlyInvoice = onCall(
+  { region: "europe-west1" },
+  async ({ auth }) => {
+    if (!auth) throw new Error("Login erforderlich.");
+
+    const uid = auth.uid;
+    const stripe = getStripe();
+    const userRef = db.collection("users").doc(uid);
+    const snap = await userRef.get();
+    const userData = snap.data() || {};
+
+    const customerId = userData.stripeCustomerId;
+    if (!customerId) throw new Error("Kein Stripe-Kunde gefunden.");
+
+    const subId = userData.stripeSubscriptionId;
+    if (!subId) throw new Error("Keine aktive Subscription gefunden.");
+
+    // Get subscription to find the latest paid period
+    const subscription = await stripe.subscriptions.retrieve(subId);
+    if (!subscription || subscription.status === "canceled") {
+      throw new Error("Keine aktive Subscription gefunden.");
+    }
+
+    // Update Stripe customer address from billing data
+    const billing = userData.billingAddress || {};
+    await stripe.customers.update(customerId, {
+      name: [billing.firstName, billing.lastName].filter(Boolean).join(" ") || undefined,
+      address: {
+        line1: billing.street || "",
+        postal_code: billing.zip || "",
+        city: billing.city || "",
+        country: billing.country || "DE",
+      },
+      metadata: {
+        company: billing.company || "",
+      },
+    });
+
+    // Determine the last paid period
+    const periodStart = subscription.current_period_start;
+    const periodEnd = subscription.current_period_end;
+
+    const startDate = new Date(periodStart * 1000);
+    const monthName = startDate.toLocaleString("de-DE", { month: "long", year: "numeric" });
+
+    // Get the subscription item price
+    const subItem = subscription.items.data[0];
+    const unitAmount = subItem.price.unit_amount;
+    const currency = subItem.price.currency;
+
+    // Create invoice
+    const invoice = await stripe.invoices.create({
+      customer: customerId,
+      auto_advance: false,
+      collection_method: "send_invoice",
+      days_until_due: 0,
+      metadata: {
+        firebaseUid: uid,
+        periodStart: periodStart.toString(),
+        periodEnd: periodEnd.toString(),
+      },
+    });
+
+    // Add line item
+    await stripe.invoiceItems.create({
+      customer: customerId,
+      invoice: invoice.id,
+      amount: unitAmount,
+      currency: currency,
+      description: `Immobot Pro – ${monthName}`,
+    });
+
+    // Finalize
+    const finalized = await stripe.invoices.finalizeInvoice(invoice.id);
+
+    return {
+      invoiceUrl: finalized.invoice_pdf,
+      hostedUrl: finalized.hosted_invoice_url,
+    };
+  }
+);
+
+// ============================================================================
 // TRACK OFFER CLICK (HTTPS onRequest v2)
 // ============================================================================
 exports.trackOfferClick = onRequest(
