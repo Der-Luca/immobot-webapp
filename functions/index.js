@@ -475,41 +475,132 @@ exports.createMonthlyInvoice = onCall(
     });
 
     // Determine the last paid period
-    const periodStart = subscription.current_period_start;
-    const periodEnd = subscription.current_period_end;
+    let periodStart =
+      subscription.current_period_start ?? subscription.billing_cycle_anchor;
+    let periodEnd = subscription.current_period_end;
+
+    // Fallback: derive month from user data when Stripe doesn't provide a period
+    if (!periodStart || !periodEnd) {
+      const acceptedTermsAt =
+        userData.acceptedTermsAt?.toDate?.() ?? userData.acceptedTermsAt;
+      const fallbackDate =
+        (userData.stripeLastPayment && new Date(userData.stripeLastPayment)) ||
+        (acceptedTermsAt && new Date(acceptedTermsAt)) ||
+        null;
+
+      if (fallbackDate && !Number.isNaN(fallbackDate.getTime())) {
+        const year = fallbackDate.getUTCFullYear();
+        const month = fallbackDate.getUTCMonth();
+        periodStart = Math.floor(Date.UTC(year, month, 1) / 1000);
+        periodEnd = Math.floor(Date.UTC(year, month + 1, 1) / 1000);
+      } else {
+        throw new Error(
+          "Subscription-Zeitraum fehlt und kein Fallback-Datum gefunden (acceptedTermsAt/stripeLastPayment)."
+        );
+      }
+    }
 
     const startDate = new Date(periodStart * 1000);
     const monthName = startDate.toLocaleString("de-DE", { month: "long", year: "numeric" });
+    const monthKey = `${startDate.getUTCFullYear()}-${String(startDate.getUTCMonth() + 1).padStart(2, "0")}`;
+    const invoiceDocId = `${uid}_${monthKey}`;
+    const invoiceDocRef = db.collection("monthlyInvoices").doc(invoiceDocId);
+
+    let existingInvoiceData = null;
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(invoiceDocRef);
+      if (doc.exists) {
+        existingInvoiceData = doc.data() || {};
+        return;
+      }
+      tx.set(invoiceDocRef, {
+        uid,
+        monthKey,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "creating",
+      });
+    });
+
+    if (existingInvoiceData) {
+      const existingStripeInvoiceId = existingInvoiceData.stripeInvoiceId;
+      if (!existingStripeInvoiceId) {
+        throw new Error(
+          "Rechnung für diesen Monat existiert, aber stripeInvoiceId fehlt."
+        );
+      }
+      const existingInvoice = await stripe.invoices.retrieve(existingStripeInvoiceId);
+      return {
+        invoiceUrl: existingInvoice.invoice_pdf,
+        hostedUrl: existingInvoice.hosted_invoice_url,
+      };
+    }
 
     // Get the subscription item price
-    const subItem = subscription.items.data[0];
-    const unitAmount = subItem.price.unit_amount;
-    const currency = subItem.price.currency;
+    const subItem = subscription.items?.data?.[0];
+    const unitAmount = subItem?.price?.unit_amount;
+    const currency = subItem?.price?.currency;
+    if (unitAmount == null || !currency) {
+      throw new Error(
+        "Preis der Subscription fehlt. Bitte prüfe die Stripe-Subscription-Items."
+      );
+    }
 
-    // Create invoice
-    const invoice = await stripe.invoices.create({
-      customer: customerId,
-      auto_advance: false,
-      collection_method: "send_invoice",
-      days_until_due: 0,
-      metadata: {
-        firebaseUid: uid,
-        periodStart: periodStart.toString(),
-        periodEnd: periodEnd.toString(),
-      },
-    });
+    let invoice = null;
+    let finalized = null;
+    try {
+      // Create invoice
+      invoice = await stripe.invoices.create({
+        customer: customerId,
+        auto_advance: false,
+        collection_method: "send_invoice",
+        days_until_due: 0,
+        metadata: {
+          firebaseUid: uid,
+          periodStart: periodStart.toString(),
+          periodEnd: periodEnd.toString(),
+          monthKey,
+        },
+      });
 
-    // Add line item
-    await stripe.invoiceItems.create({
-      customer: customerId,
-      invoice: invoice.id,
-      amount: unitAmount,
-      currency: currency,
-      description: `Immobot Pro – ${monthName}`,
-    });
+      // Add line item
+      await stripe.invoiceItems.create({
+        customer: customerId,
+        invoice: invoice.id,
+        amount: unitAmount,
+        currency: currency,
+        description: `Immobot Pro – ${monthName}`,
+      });
 
-    // Finalize
-    const finalized = await stripe.invoices.finalizeInvoice(invoice.id);
+      // Finalize
+      finalized = await stripe.invoices.finalizeInvoice(invoice.id);
+
+      await invoiceDocRef.set(
+        {
+          uid,
+          monthKey,
+          stripeInvoiceId: finalized.id,
+          customerId,
+          subscriptionId: subId,
+          periodStart,
+          periodEnd,
+          status: "finalized",
+          invoiceUrl: finalized.invoice_pdf || null,
+          hostedUrl: finalized.hosted_invoice_url || null,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      await invoiceDocRef.set(
+        {
+          status: "error",
+          errorMessage: err?.message || "Unknown error",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      throw err;
+    }
 
     return {
       invoiceUrl: finalized.invoice_pdf,
