@@ -158,6 +158,16 @@ export default function Dashboard() {
                   <p className="text-white/60 text-sm leading-relaxed max-w-xs">
                     Deine Kriterien für Standort, Preis und Ausstattung.
                   </p>
+                  {filters?.radiusInKm != null && (
+                    <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-white/80 text-xs font-semibold">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <circle cx="12" cy="12" r="3" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a10 10 0 100 20A10 10 0 0012 2z" opacity="0.3" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6a6 6 0 100 12A6 6 0 0012 6z" opacity="0.5" />
+                      </svg>
+                      Radius: {filters.radiusInKm} km
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-8 flex items-center text-sm font-bold text-white/80 group-hover:text-white transition-colors">
