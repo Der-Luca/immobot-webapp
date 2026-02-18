@@ -438,29 +438,7 @@ export default function UserProfile() {
                     >
                       {savingBilling ? "Speichere…" : "Adresse speichern"}
                     </button>
-
-                    <button
-                      onClick={createInvoice}
-                      disabled={invoiceLoading}
-                      className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60"
-                    >
-                      {invoiceLoading ? "Erstelle Rechnung…" : "Rechnung erstellen"}
-                    </button>
                   </div>
-
-                  {invoiceUrl && (
-                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm">
-                      <p className="text-emerald-800 font-medium mb-2">Rechnung erstellt!</p>
-                      <a
-                        href={invoiceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 underline text-sm"
-                      >
-                        PDF herunterladen
-                      </a>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -535,6 +513,36 @@ export default function UserProfile() {
                 </button>
               </div>
             </div>
+
+            {/* Rechnungen */}
+            {isPremium && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                <h2 className="font-bold text-gray-900 mb-4">Rechnungen</h2>
+                <p className="text-xs text-gray-500 mb-4">
+                  Erstelle eine Rechnung für den aktuellen Monat auf Basis deiner gespeicherten Rechnungsadresse.
+                </p>
+                <button
+                  onClick={createInvoice}
+                  disabled={invoiceLoading}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 transition"
+                >
+                  {invoiceLoading ? "Erstelle Rechnung…" : "Rechnung erstellen"}
+                </button>
+                {invoiceUrl && (
+                  <div className="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm">
+                    <p className="text-emerald-800 font-medium mb-2">Rechnung erstellt!</p>
+                    <a
+                      href={invoiceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline text-sm"
+                    >
+                      PDF herunterladen
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
