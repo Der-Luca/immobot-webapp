@@ -364,19 +364,91 @@ exports.sendVerifyEmail = onCall(
       from: `"Immobot" <${SMTP_USER.value()}>`,
       to: userRecord.email,
       subject: "Bitte bestätige deine E-Mail-Adresse",
-      html: `
-        <p>Willkommen bei <strong>Immobot</strong>,</p>
-        <p>bitte bestätige deine E-Mail-Adresse, um dein Konto zu aktivieren:</p>
-        <p>
-          <a href="${verifyUrl}"
-             style="display:inline-block;padding:12px 18px;
-             background:#0f172a;color:#fff;border-radius:6px;text-decoration:none;">
-            E-Mail-Adresse bestätigen
-          </a>
-        </p>
-        <p>Falls du dich nicht registriert hast, ignoriere diese E-Mail.</p>
-        <p>– Dein Immobot-Team</p>
-      `,
+      html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>E-Mail bestätigen</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F8FA;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F5F8FA;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+               style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+
+          <!-- HEADER -->
+          <tr>
+            <td align="center" style="background-color:#0A3D62;color:#ffffff;padding:20px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;">
+                Willkommen bei Immobot
+              </h1>
+            </td>
+          </tr>
+
+          <!-- HERO IMAGE -->
+          <tr>
+            <td align="center" style="padding:0;margin:0;">
+              <img
+                src="https://immobot.pro/mail-bilder/hero.png"
+                alt="Immobot"
+                width="600"
+                style="display:block;width:100%;max-width:600px;height:auto;border:0;margin:0;"
+              />
+            </td>
+          </tr>
+
+          <!-- GREETING -->
+          <tr>
+            <td style="padding:20px 20px 0 20px;color:#555555;font-size:16px;">
+              Hallo,
+            </td>
+          </tr>
+
+          <!-- CONTENT -->
+          <tr>
+            <td style="padding:20px;color:#555555;font-size:16px;line-height:1.5;">
+              bitte bestätige deine E-Mail-Adresse, um dein Immobot-Konto zu aktivieren und mit der Immobiliensuche zu starten.
+            </td>
+          </tr>
+
+          <!-- BUTTON -->
+          <tr>
+            <td style="padding:0 20px 24px 20px;">
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0;">
+                <tr>
+                  <td style="border-radius:6px;" bgcolor="#0A3D62">
+                    <a href="${verifyUrl}"
+                       target="_blank"
+                       style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;border-radius:6px;">
+                      E-Mail-Adresse bestätigen
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="padding:10px 20px 24px 20px;color:#6b7280;font-size:13px;line-height:1.5;">
+              <hr style="border:0;border-top:1px solid #E5E7EB;margin:10px 0 16px 0;" />
+              <div style="margin:0 0 12px 0;">
+                Falls du dich nicht registriert hast, ignoriere diese E-Mail.
+              </div>
+              <div>
+                Falls der Button nicht funktioniert:
+                <a href="${verifyUrl}" target="_blank" style="color:#0A3D62;text-decoration:underline;">${verifyUrl}</a>
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
     });
 
     return { ok: true };
