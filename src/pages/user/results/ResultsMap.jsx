@@ -81,7 +81,7 @@ export default function ResultsMap({ offers = [], onMarkerClick, selectedId }) {
               ${o.price ? o.price + " €" : ""}<br/>
               ${o.rooms ? o.rooms + " Zimmer" : ""}
             </div>
-          `);
+          `, { autoPan: false });
 
         marker.on("click", () => {
           marker.openPopup();
@@ -109,8 +109,10 @@ export default function ResultsMap({ offers = [], onMarkerClick, selectedId }) {
     const marker = leafletRef.current.markers[selectedId];
     const map = leafletRef.current.map;
     if (marker && map) {
-      map.setView(marker.getLatLng(), 14, { animate: true });
-      marker.openPopup();
+      const zoom = Math.max(map.getZoom(), 14);
+      map.setView(marker.getLatLng(), zoom, { animate: true });
+      // Popup erst nach der Animation öffnen, damit setView nicht überschrieben wird
+      setTimeout(() => marker.openPopup(), 300);
     }
   }, [selectedId]);
 
