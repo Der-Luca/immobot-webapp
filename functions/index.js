@@ -607,57 +607,38 @@ exports.createMonthlyInvoice = onCall(
       };
     }
 
-    // Get the subscription item price
-    const subItem = subscription.items?.data?.[0];
-    const unitAmount = subItem?.price?.unit_amount;
-    const currency = subItem?.price?.currency;
-    if (unitAmount == null || !currency) {
-      throw new Error(
-        "Preis der Subscription fehlt. Bitte prüfe die Stripe-Subscription-Items."
-      );
-    }
-
-    let invoice = null;
-    let finalized = null;
+    let paidInvoice = null;
     try {
-      // Create invoice
-      invoice = await stripe.invoices.create({
+      const invoiceList = await stripe.invoices.list({
         customer: customerId,
-        auto_advance: false,
-        collection_method: "send_invoice",
-        days_until_due: 0,
-        metadata: {
-          firebaseUid: uid,
-          periodStart: periodStart.toString(),
-          periodEnd: periodEnd.toString(),
-          monthKey,
-        },
+        subscription: subId,
+        limit: 20,
       });
 
-      // Add line item
-      await stripe.invoiceItems.create({
-        customer: customerId,
-        invoice: invoice.id,
-        amount: unitAmount,
-        currency: currency,
-        description: `Immobot Pro – ${monthName}`,
-      });
+      paidInvoice = invoiceList.data.find(
+        (inv) =>
+          inv.status === "paid" &&
+          (inv.period_start === periodStart || inv.period_end === periodEnd)
+      );
 
-      // Finalize
-      finalized = await stripe.invoices.finalizeInvoice(invoice.id);
+      if (!paidInvoice) {
+        throw new Error(
+          "Keine bezahlte Rechnung fuer diesen Zeitraum gefunden."
+        );
+      }
 
       await invoiceDocRef.set(
         {
           uid,
           monthKey,
-          stripeInvoiceId: finalized.id,
+          stripeInvoiceId: paidInvoice.id,
           customerId,
           subscriptionId: subId,
           periodStart,
           periodEnd,
-          status: "finalized",
-          invoiceUrl: finalized.invoice_pdf || null,
-          hostedUrl: finalized.hosted_invoice_url || null,
+          status: "paid",
+          invoiceUrl: paidInvoice.invoice_pdf || null,
+          hostedUrl: paidInvoice.hosted_invoice_url || null,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -675,8 +656,8 @@ exports.createMonthlyInvoice = onCall(
     }
 
     return {
-      invoiceUrl: finalized.invoice_pdf,
-      hostedUrl: finalized.hosted_invoice_url,
+      invoiceUrl: paidInvoice.invoice_pdf,
+      hostedUrl: paidInvoice.hosted_invoice_url,
     };
   }
 );
