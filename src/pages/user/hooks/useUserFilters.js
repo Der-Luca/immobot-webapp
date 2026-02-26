@@ -30,9 +30,8 @@ export default function useUserFilters() {
           lastSearch = {
             offerTypes: [],
             objectClasses: [],
-            objectCategories: [], // 🔥 DAS hat gefehlt
+            objectCategories: [],
             priceRange: { to: null },
-            propertySpaceRange: { from: null, to: null },
           };
 
           await setDoc(ref, { lastSearch }, { merge: true });

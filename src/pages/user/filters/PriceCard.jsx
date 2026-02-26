@@ -71,17 +71,11 @@ export default function PriceCard({ filters, onChange }) {
     : SPACE_PRESETS_APARTMENT;
 
   const [priceTo, setPriceTo] = useState(filters.priceRange?.to ?? null);
-  const [spaceRange, setSpaceRange] = useState({
-    from: filters.propertySpaceRange?.from ?? null,
-    to: filters.propertySpaceRange?.to ?? null,
-  });
+  const [spaceRange, setSpaceRange] = useState(filters.propertySpaceRange ?? null);
 
   useEffect(() => {
     setPriceTo(filters.priceRange?.to ?? null);
-    setSpaceRange({
-      from: filters.propertySpaceRange?.from ?? null,
-      to: filters.propertySpaceRange?.to ?? null,
-    });
+    setSpaceRange(filters.propertySpaceRange ?? null);
   }, [filters]);
 
   const enterEdit = () => setIsEditing(true);
@@ -110,11 +104,10 @@ export default function PriceCard({ filters, onChange }) {
 
   const selectSpace = (preset) => {
     if (!isEditing) return;
-    setSpaceRange({ from: preset.from, to: preset.to });
-    onChange({
-      ...filters,
-      propertySpaceRange: { from: preset.from, to: preset.to },
-    });
+    const isAny = preset.from === null && preset.to === null;
+    const newRange = isAny ? null : { from: preset.from, to: preset.to };
+    setSpaceRange(newRange);
+    onChange({ ...filters, propertySpaceRange: newRange });
   };
 
   return (
@@ -197,6 +190,7 @@ export default function PriceCard({ filters, onChange }) {
             <div className="flex flex-wrap gap-2">
               {spacePresets.map((preset, i) => {
                 const active =
+                  spaceRange !== null &&
                   spaceRange.from === preset.from &&
                   spaceRange.to === preset.to;
 
