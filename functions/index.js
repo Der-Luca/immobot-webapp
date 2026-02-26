@@ -493,6 +493,7 @@ exports.verifyEmail = onRequest(
 
     await userRef.update({
       emailVerified: true,
+      emailVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
       emailVerifyToken: admin.firestore.FieldValue.delete(),
       emailVerifyExpiresAt: admin.firestore.FieldValue.delete(),
     });

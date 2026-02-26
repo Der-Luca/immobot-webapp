@@ -10,6 +10,7 @@ export const useAuth = () => useContext(AuthCtx);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [emailVerified, setEmailVerified] = useState(null);
   const [ready, setReady] = useState(false);
   const [checkoutStarted, setCheckoutStarted] = useState(false);
 
@@ -18,11 +19,14 @@ export function AuthProvider({ children }) {
       setUser(u || null);
 
       if (u) {
-        // 🔥 Rolle aus Firestore laden (optional)
+        // 🔥 Rolle + E-Mail-Verifizierung aus Firestore laden
         const snap = await getDoc(doc(db, "users", u.uid));
-        setRole(snap.exists() ? snap.data()?.role || null : null);
+        const data = snap.exists() ? snap.data() : {};
+        setRole(data?.role || null);
+        setEmailVerified(data?.emailVerified ?? null);
       } else {
         setRole(null);
+        setEmailVerified(null);
       }
 
       setReady(true);
@@ -33,6 +37,7 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     role,
+    emailVerified,
     ready,
     logout: () => signOut(auth),
   };

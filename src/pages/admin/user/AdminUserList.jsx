@@ -142,7 +142,13 @@ export default function AdminUserList() {
                 >
                   Status <SortIcon column="stripeStatus" />
                 </th>
-                <th 
+                <th
+                  onClick={() => handleSort("emailVerified")}
+                  className="px-6 py-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 group select-none transition-colors"
+                >
+                  E-Mail <SortIcon column="emailVerified" />
+                </th>
+                <th
                   onClick={() => handleSort("createdAt")}
                   className="px-6 py-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 group select-none transition-colors"
                 >
@@ -157,7 +163,7 @@ export default function AdminUserList() {
             <tbody className="divide-y divide-gray-100">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan="6" className="px-6 py-10 text-center text-gray-500">
                     Keine Benutzer gefunden.
                   </td>
                 </tr>
@@ -191,9 +197,23 @@ export default function AdminUserList() {
                         </span>
                       </td>
 
+                      <td className="px-6 py-4">
+                        {u.emailVerified === true ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                            Bestätigt
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" /></svg>
+                            Ausstehend
+                          </span>
+                        )}
+                      </td>
+
                       <td className="px-6 py-4 text-gray-500 font-mono text-xs">
-                        {u.createdAtDate?.toLocaleDateString("de-DE", { 
-                          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit' 
+                        {u.createdAtDate?.toLocaleDateString("de-DE", {
+                          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'
                         }) ?? "—"}
                       </td>
                       
