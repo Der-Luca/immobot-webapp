@@ -24,8 +24,8 @@ const CLASS_OPTIONS = [
 export default function Step1() {
   const nav = useNavigate();
 
- 
   const [filters, setFilters] = useState(() => getState());
+  const [error, setError] = useState("");
 
   const selectedClasses = filters.objectClasses || [];
 
@@ -38,21 +38,35 @@ export default function Step1() {
 
   const [selectedTop, setSelectedTop] = useState(initialTop);
 
-  function selectTop(mode) {
-    setSelectedTop(mode);
-    setFilters(getState()); // sync UI
-  }
-
   function onToggleClass(val) {
     toggleObjectClass(val);
     setFilters(getState()); // 🔁 UI neu aus Storage lesen
   }
 
   function selectTop(mode) {
-  setOfferType(mode);       // ✅ persistiert
-  setSelectedTop(mode);     // UI
-  setFilters(getState());   // UI sync
-}
+    setOfferType(mode); // ✅ persistiert
+    setSelectedTop(mode); // UI
+    setFilters(getState()); // UI sync
+  }
+
+  const canProceed = Boolean(selectedTop) && selectedClasses.length > 0;
+
+  function onNext() {
+    const missingOffer = !selectedTop;
+    const missingClass = selectedClasses.length === 0;
+
+    if (missingOffer || missingClass) {
+      const parts = [];
+      if (missingOffer) parts.push("Angebotsart");
+      if (missingClass) parts.push("mindestens eine Objektart");
+      setError(`Bitte ${parts.join(" und ")} auswählen.`);
+      setTimeout(() => setError(""), 2500);
+      return;
+    }
+
+    setError("");
+    nav("/register/step2");
+  }
 
   return (
     <div className="
@@ -123,14 +137,26 @@ export default function Step1() {
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-center mt-6">
+      <div className="flex flex-col items-center gap-2 mt-6">
         <button
           type="button"
-          onClick={() => nav("/register/step2")}
-          className="px-8 py-3 rounded-xl bg-blue-900 text-white font-medium"
+          onClick={onNext}
+          className={`px-8 py-3 rounded-xl font-medium ${
+            canProceed
+              ? "bg-blue-900 text-white"
+              : "bg-gray-300 text-gray-700"
+          }`}
         >
           Schritt 2 &gt;
         </button>
+        {error && (
+          <div
+            role="alert"
+            className="mt-2 w-full max-w-md rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm"
+          >
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );

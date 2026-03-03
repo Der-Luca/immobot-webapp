@@ -13,6 +13,10 @@ export default function Step2() {
   const [query, setQuery] = useState(initial.address || "");
   const [suggestions, setSuggestions] = useState([]);
   const [radius, setRadius] = useState(initial.radiusInKm ?? 10);
+  const [selectedCoordinate, setSelectedCoordinate] = useState(
+    initial.coordinate ?? null
+  );
+  const [error, setError] = useState("");
 
   const [hasUserTyped, setHasUserTyped] = useState(false);
 
@@ -146,6 +150,8 @@ export default function Step2() {
 
     setAddress(item.label);
     setCoordinate({ lat: item.lat, lon: item.lon });
+    setSelectedCoordinate({ lat: item.lat, lon: item.lon });
+    setError("");
     drawMarkerAndCircle(item.lat, item.lon, radius);
   }
 
@@ -200,6 +206,9 @@ export default function Step2() {
           onChange={(e) => {
             setQuery(e.target.value);
             setHasUserTyped(true); // 🔑 erst jetzt Autocomplete
+            setSelectedCoordinate(null);
+            setAddress("");
+            setCoordinate(undefined);
           }}
           placeholder="z. B. Freiburg im Breisgau"
           className="w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -256,7 +265,16 @@ export default function Step2() {
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between gap-4">
+      <div className="flex flex-col items-stretch gap-2">
+        {error && (
+          <div
+            role="alert"
+            className="mx-auto w-full max-w-md rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm text-center"
+          >
+            {error}
+          </div>
+        )}
+        <div className="flex justify-between gap-4">
         <button
           className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
           onClick={() => navigate("/register/step1")}
@@ -265,11 +283,24 @@ export default function Step2() {
         </button>
 
         <button
-          className="px-8 py-3 rounded-xl bg-blue-900 text-white font-medium hover:bg-blue-800 active:scale-95"
-          onClick={() => navigate("/register/step3")}
+          className={`px-8 py-3 rounded-xl font-medium ${
+            selectedCoordinate
+              ? "bg-blue-900 text-white hover:bg-blue-800 active:scale-95"
+              : "bg-gray-300 text-gray-600 cursor-not-allowed"
+          }`}
+          onClick={() => {
+            if (!selectedCoordinate) {
+              setError("Bitte eine Ortschaft aus der Liste auswählen.");
+              setTimeout(() => setError(""), 2500);
+              return;
+            }
+            setError("");
+            navigate("/register/step3");
+          }}
         >
           Schritt 3 &gt;
         </button>
+        </div>
       </div>
     </div>
   );

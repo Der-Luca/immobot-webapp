@@ -276,7 +276,7 @@ sendVerify();
           disabled={!canSubmit}
           className="w-full px-6 py-3 rounded-xl bg-blue-900 text-white font-medium shadow-sm hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition active:scale-95"
         >
-          {busy ? "Speichere..." : "Kostenpflichtig weiter"}
+          {busy ? "Speichere..." : " Weiter"}
         </button>
 
         <p className="text-xs text-gray-500 mt-2 text-center px-2">
