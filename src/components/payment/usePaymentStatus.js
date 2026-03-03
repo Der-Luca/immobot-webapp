@@ -22,8 +22,11 @@ export default function usePaymentStatus() {
 
   load();
 
-  // 🔁 solange pending → alle 3 Sekunden neu prüfen
-  if (userDoc?.stripeStatus === "pending") {
+  // 🔁 solange pending/checkout_started → alle 3 Sekunden neu prüfen
+  if (
+    userDoc?.stripeStatus === "pending" ||
+    userDoc?.stripeStatus === "checkout_started"
+  ) {
     interval = setInterval(load, 3000);
   }
 
@@ -48,7 +51,8 @@ export default function usePaymentStatus() {
     subscriptionStatus !== "past_due" &&
     subscriptionStatus !== "unpaid";
 
-  const isPending = stripeStatus === "pending";
+  const isPending =
+    stripeStatus === "pending" || stripeStatus === "checkout_started";
   const isPaymentFailed = stripeStatus === "payment_failed";
   const isCancelled = stripeStatus === "cancelled";
 
