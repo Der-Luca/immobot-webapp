@@ -67,6 +67,19 @@ exports.createCheckoutSession = onCall(
 
     let customerId = userData.stripeCustomerId;
 
+    // Prüfen ob gespeicherte Customer-ID noch gültig ist (z.B. Test→Live Wechsel)
+    if (customerId) {
+      try {
+        await stripe.customers.retrieve(customerId);
+      } catch (err) {
+        if (err.code === "resource_missing") {
+          customerId = null; // ungültige ID → neu anlegen
+        } else {
+          throw err;
+        }
+      }
+    }
+
     if (!customerId) {
       const userRecord = await admin.auth().getUser(uid).catch(() => null);
       const email =

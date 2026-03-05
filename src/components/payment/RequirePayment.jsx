@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "../../firebase";
+import { doc, updateDoc, deleteField } from "firebase/firestore";
+import { functions, db } from "../../firebase";
 import usePaymentStatus from "./usePaymentStatus";
 import PaymentOverlay from "./PaymentOverlay";
 import ReactivateOverlay from "./ReactivateOverlay";
-import { useAuth } from "../../contexts/AuthContext"; // 👈 neu
+import { useAuth } from "../../contexts/AuthContext";
 
 //  Stripe Price ID
 const PRICE_MONTHLY = import.meta.env.VITE_STRIPE_PRICE_MONTHLY;
 
 export default function RequirePayment({ children }) {
-  const { logout } = useAuth(); // 👈 neu
+  const { user, logout } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const {
     loading,
@@ -23,6 +26,19 @@ export default function RequirePayment({ children }) {
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState("");
+
+  // Stripe cancel_url → ?checkout=cancel → stripeStatus zurücksetzen
+  useEffect(() => {
+    if (searchParams.get("checkout") === "cancel" && user) {
+      updateDoc(doc(db, "users", user.uid), { stripeStatus: deleteField() });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, user, setSearchParams]);
+
+  async function resetCheckout() {
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.uid), { stripeStatus: deleteField() });
+  }
 
   async function startCheckout() {
     setError("");
@@ -62,25 +78,34 @@ export default function RequirePayment({ children }) {
   }
 
   if (isPending) {
-  return (
-    <div className="fixed inset-0 bg-white/80 backdrop-blur-md flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl border p-6 max-w-md text-center">
-        <div className="flex justify-center mb-4">
-          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+    return (
+      <div className="fixed inset-0 bg-white/80 backdrop-blur-md flex items-center justify-center z-50 px-4">
+        <div className="bg-white rounded-2xl shadow-xl border p-6 max-w-md text-center">
+          <div className="flex justify-center mb-4">
+            <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          </div>
+
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">
+            Zahlung wird bestätigt
+          </h2>
+
+          <p className="text-sm text-slate-600">
+            Wir prüfen gerade deine Zahlung.
+            Das dauert in der Regel nur ein paar Sekunden.
+          </p>
+
+          <div className="mt-5">
+            <button
+              onClick={resetCheckout}
+              className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"
+            >
+              Abbrechen
+            </button>
+          </div>
         </div>
-
-        <h2 className="text-lg font-semibold text-slate-900 mb-2">
-          Zahlung wird bestätigt
-        </h2>
-
-        <p className="text-sm text-slate-600">
-          Wir prüfen gerade deine Zahlung.  
-          Das dauert in der Regel nur ein paar Sekunden.
-        </p>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 
   //  Zahlung fehlgeschlagen
