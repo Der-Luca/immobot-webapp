@@ -26,6 +26,7 @@ export default function RequirePayment({ children }) {
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState("");
+  const [pendingTired, setPendingTired] = useState(false);
 
   // Stripe cancel_url → ?checkout=cancel → stripeStatus zurücksetzen
   useEffect(() => {
@@ -34,6 +35,20 @@ export default function RequirePayment({ children }) {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, user, setSearchParams]);
+
+  // Timeout: nach 2 min Hinweis, nach 5 min Auto-Reset
+  useEffect(() => {
+    if (!isPending) {
+      setPendingTired(false);
+      return;
+    }
+    const tiredTimer = setTimeout(() => setPendingTired(true), 2 * 60 * 1000);
+    const resetTimer = setTimeout(() => resetCheckout(), 5 * 60 * 1000);
+    return () => {
+      clearTimeout(tiredTimer);
+      clearTimeout(resetTimer);
+    };
+  }, [isPending]);
 
   async function resetCheckout() {
     if (!user) return;
@@ -89,19 +104,34 @@ export default function RequirePayment({ children }) {
             Zahlung wird bestätigt
           </h2>
 
-          <p className="text-sm text-slate-600">
-            Wir prüfen gerade deine Zahlung.
-            Das dauert in der Regel nur ein paar Sekunden.
-          </p>
-
-          <div className="mt-5">
-            <button
-              onClick={resetCheckout}
-              className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"
-            >
-              Abbrechen
-            </button>
-          </div>
+          {pendingTired ? (
+            <>
+              <p className="text-sm text-slate-600">
+                Das dauert ungewöhnlich lang. Hast du den Checkout abgebrochen?
+              </p>
+              <button
+                onClick={resetCheckout}
+                className="mt-5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+              >
+                Ja, zurück zur Übersicht
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-600">
+                Wir prüfen gerade deine Zahlung.
+                Das dauert in der Regel nur ein paar Sekunden.
+              </p>
+              <div className="mt-5">
+                <button
+                  onClick={resetCheckout}
+                  className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
