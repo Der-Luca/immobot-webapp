@@ -187,22 +187,18 @@ useEffect(() => {
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">
               Standort & Radius
             </h2>
-            {/* Adresse + Radius in einer Zeile unter dem Titel (nur Anzeige-Modus) */}
+            {/* Adresse links, Radius rechts in derselben Zeile (nur Anzeige-Modus) */}
             {!isEditing && (address || radius != null) && (
-              <div className="mt-1 flex items-center justify-between gap-3">
+              <div className="mt-1 flex items-center justify-between gap-4">
                 {address && (
-                  <p className="text-sm text-gray-500 truncate flex-1 min-w-0">
+                  <p className="text-sm text-gray-500 truncate min-w-0 flex-1">
                     {address}
                   </p>
                 )}
                 {radius != null && (
-                  <span className="inline-flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-sm font-semibold">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <circle cx="12" cy="12" r="3" />
-                      <circle cx="12" cy="12" r="8" strokeOpacity="0.4" />
-                    </svg>
+                  <p className="text-sm text-gray-500 shrink-0 text-right">
                     {radius} km
-                  </span>
+                  </p>
                 )}
               </div>
             )}
