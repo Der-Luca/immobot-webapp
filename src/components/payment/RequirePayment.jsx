@@ -36,14 +36,14 @@ export default function RequirePayment({ children }) {
     }
   }, [searchParams, user, setSearchParams]);
 
-  // Timeout: nach 2 min Hinweis, nach 5 min Auto-Reset
+  // Timeout: nach 10 Sek. Hinweis, nach 30 Sek. Auto-Reset
   useEffect(() => {
     if (!isPending) {
       setPendingTired(false);
       return;
     }
-    const tiredTimer = setTimeout(() => setPendingTired(true), 2 * 60 * 1000);
-    const resetTimer = setTimeout(() => resetCheckout(), 5 * 60 * 1000);
+    const tiredTimer = setTimeout(() => setPendingTired(true), 10 * 1000);
+    const resetTimer = setTimeout(() => resetCheckout(), 30 * 1000);
     return () => {
       clearTimeout(tiredTimer);
       clearTimeout(resetTimer);
@@ -122,12 +122,15 @@ export default function RequirePayment({ children }) {
                 Wir prüfen gerade deine Zahlung.
                 Das dauert in der Regel nur ein paar Sekunden.
               </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Falls du Stripe geschlossen oder abgebrochen hast, kannst du hier direkt zur Übersicht zurück.
+              </p>
               <div className="mt-5">
                 <button
                   onClick={resetCheckout}
-                  className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"
+                  className="text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2"
                 >
-                  Abbrechen
+                  Stripe geschlossen oder abgebrochen?
                 </button>
               </div>
             </>
