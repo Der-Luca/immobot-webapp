@@ -211,173 +211,40 @@ exports.reactivateSubscription = onCall(
 // ============================================================================
 // STRIPE WEBHOOK
 // ============================================================================
-exports.handleStripeWebhook = onRequest(
-  { region: "europe-west1" },
-  async (req, res) => {
-    const stripe = getStripe();
-    const sig = req.headers["stripe-signature"];
+// ============================================================================
+// SHARED HELPER: Double Opt-In Mail senden (intern, für Webhook + onCall)
+// ============================================================================
+async function sendVerifyEmailForUid(uid) {
+  const crypto = require("crypto");
+  const userRecord = await admin.auth().getUser(uid);
 
-    let event;
-    try {
-      event = stripe.webhooks.constructEvent(
-        req.rawBody,
-        sig,
-        STRIPE_WEBHOOK_SECRET.value()
-      );
-    } catch (err) {
-      console.error("❌ Webhook Signatur ungültig", err.message);
-      return res.status(400).send("Invalid signature");
-    }
-
-    const obj = event.data.object;
-
-    try {
-      switch (event.type) {
-        case "checkout.session.completed": {
-          const uid = obj.metadata?.firebaseUid;
-          if (uid) {
-            await db.collection("users").doc(uid).set(
-              {
-                stripeStatus: "pending",
-                stripeCustomerId: obj.customer,
-                stripeSubscriptionId: obj.subscription,
-              },
-              { merge: true }
-            );
-          }
-          break;
-        }
-
-        case "invoice.payment_succeeded": {
-          const snap = await db
-            .collection("users")
-            .where("stripeCustomerId", "==", obj.customer)
-            .limit(1)
-            .get();
-
-          if (!snap.empty) {
-            await snap.docs[0].ref.set(
-              {
-                stripeStatus: "paid",
-                stripeLastPayment: new Date().toISOString(),
-              },
-              { merge: true }
-            );
-          }
-          break;
-        }
-
-        case "invoice.payment_failed": {
-          const snap = await db
-            .collection("users")
-            .where("stripeCustomerId", "==", obj.customer)
-            .limit(1)
-            .get();
-
-          if (!snap.empty) {
-            await snap.docs[0].ref.set(
-              {
-                stripeStatus: "payment_failed",
-                stripeLastPaymentError:
-                  obj.last_payment_error?.message || "Zahlung fehlgeschlagen",
-              },
-              { merge: true }
-            );
-          }
-          break;
-        }
-
-        case "customer.subscription.updated": {
-          const snap = await db
-            .collection("users")
-            .where("stripeCustomerId", "==", obj.customer)
-            .limit(1)
-            .get();
-
-          if (!snap.empty) {
-            await snap.docs[0].ref.set(
-              {
-                stripeSubscriptionStatus: obj.status,
-                stripeCancelAtPeriodEnd: obj.cancel_at_period_end,
-              },
-              { merge: true }
-            );
-          }
-          break;
-        }
-
-        case "customer.subscription.deleted": {
-          const snap = await db
-            .collection("users")
-            .where("stripeCustomerId", "==", obj.customer)
-            .limit(1)
-            .get();
-
-          if (!snap.empty) {
-            await snap.docs[0].ref.set(
-              {
-                stripeStatus: "cancelled",
-                stripeSubscriptionStatus: "canceled",
-              },
-              { merge: true }
-            );
-          }
-          break;
-        }
-
-        default:
-          console.log("ℹ️ Ignored event:", event.type);
-      }
-
-      res.json({ received: true });
-    } catch (err) {
-      console.error("❌ Webhook Fehler", err);
-      res.status(500).send("Webhook error");
-    }
+  if (userRecord.emailVerified) {
+    return { ok: true, alreadyVerified: true };
   }
-);
 
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
 
-exports.sendVerifyEmail = onCall(
-  {
-    region: "europe-west1",
-    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
-  },
-  async ({ auth }) => {
-    if (!auth) throw new Error("Nicht eingeloggt");
+  await db.collection("users").doc(uid).set(
+    {
+      emailVerifyToken: tokenHash,
+      emailVerifyExpiresAt: Date.now() + 1000 * 60 * 60 * 24, // 24h
+      emailVerified: false,
+    },
+    { merge: true }
+  );
 
-    const uid = auth.uid;
-    const userRecord = await admin.auth().getUser(uid);
+  const verifyUrl = `https://verifyemail-zxgbc7q6ka-ew.a.run.app/verify-email?token=${rawToken}`;
+  const transporter = getMailer();
 
-    if (userRecord.emailVerified) {
-      return { ok: true, alreadyVerified: true };
-    }
-
-    const crypto = require("crypto");
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(rawToken)
-      .digest("hex");
-
-    await db.collection("users").doc(uid).set(
-      {
-        emailVerifyToken: tokenHash,
-        emailVerifyExpiresAt: Date.now() + 1000 * 60 * 60 * 24, // 24h
-        emailVerified: false,
-      },
-      { merge: true }
-    );
-
-    const verifyUrl = `https://verifyemail-zxgbc7q6ka-ew.a.run.app/verify-email?token=${rawToken}`;
-
-    const transporter = getMailer();
-
-    await transporter.sendMail({
-      from: `"Immobot" <${SMTP_USER.value()}>`,
-      to: userRecord.email,
-      subject: "Bitte bestätige deine E-Mail-Adresse",
-      html: `<!DOCTYPE html>
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: userRecord.email,
+    subject: "Bitte bestätige deine E-Mail-Adresse",
+    html: `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -462,9 +329,156 @@ exports.sendVerifyEmail = onCall(
   </table>
 </body>
 </html>`,
-    });
+  });
 
-    return { ok: true };
+  return { ok: true };
+}
+
+exports.handleStripeWebhook = onRequest(
+  { region: "europe-west1", secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS] },
+  async (req, res) => {
+    const stripe = getStripe();
+    const sig = req.headers["stripe-signature"];
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        sig,
+        STRIPE_WEBHOOK_SECRET.value()
+      );
+    } catch (err) {
+      console.error("❌ Webhook Signatur ungültig", err.message);
+      return res.status(400).send("Invalid signature");
+    }
+
+    const obj = event.data.object;
+
+    try {
+      switch (event.type) {
+        case "checkout.session.completed": {
+          const uid = obj.metadata?.firebaseUid;
+          if (uid) {
+            await db.collection("users").doc(uid).set(
+              {
+                stripeStatus: "pending",
+                stripeCustomerId: obj.customer,
+                stripeSubscriptionId: obj.subscription,
+              },
+              { merge: true }
+            );
+          }
+          break;
+        }
+
+        case "invoice.payment_succeeded": {
+          const snap = await db
+            .collection("users")
+            .where("stripeCustomerId", "==", obj.customer)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            await snap.docs[0].ref.set(
+              {
+                stripeStatus: "paid",
+                stripeLastPayment: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+
+            // Double Opt-In Mail nur beim ersten Payment senden
+            if (obj.billing_reason === "subscription_create") {
+              const uid = snap.docs[0].id;
+              try {
+                await sendVerifyEmailForUid(uid);
+              } catch (e) {
+                console.error("❌ Verify-Mail konnte nicht gesendet werden", e);
+              }
+            }
+          }
+          break;
+        }
+
+        case "invoice.payment_failed": {
+          const snap = await db
+            .collection("users")
+            .where("stripeCustomerId", "==", obj.customer)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            await snap.docs[0].ref.set(
+              {
+                stripeStatus: "payment_failed",
+                stripeLastPaymentError:
+                  obj.last_payment_error?.message || "Zahlung fehlgeschlagen",
+              },
+              { merge: true }
+            );
+          }
+          break;
+        }
+
+        case "customer.subscription.updated": {
+          const snap = await db
+            .collection("users")
+            .where("stripeCustomerId", "==", obj.customer)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            await snap.docs[0].ref.set(
+              {
+                stripeSubscriptionStatus: obj.status,
+                stripeCancelAtPeriodEnd: obj.cancel_at_period_end,
+              },
+              { merge: true }
+            );
+          }
+          break;
+        }
+
+        case "customer.subscription.deleted": {
+          const snap = await db
+            .collection("users")
+            .where("stripeCustomerId", "==", obj.customer)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            await snap.docs[0].ref.set(
+              {
+                stripeStatus: "cancelled",
+                stripeSubscriptionStatus: "canceled",
+              },
+              { merge: true }
+            );
+          }
+          break;
+        }
+
+        default:
+          console.log("ℹ️ Ignored event:", event.type);
+      }
+
+      res.json({ received: true });
+    } catch (err) {
+      console.error("❌ Webhook Fehler", err);
+      res.status(500).send("Webhook error");
+    }
+  }
+);
+
+
+exports.sendVerifyEmail = onCall(
+  {
+    region: "europe-west1",
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+  },
+  async ({ auth }) => {
+    if (!auth) throw new Error("Nicht eingeloggt");
+    return sendVerifyEmailForUid(auth.uid);
   }
 );
 

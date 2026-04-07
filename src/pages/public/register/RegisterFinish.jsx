@@ -2,10 +2,9 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db, functions } from "../../../firebase";
+import { auth, db } from "../../../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { saveCurrentFiltersForUser } from "./storage/saveFilters";
-import { httpsCallable } from "firebase/functions";
 const PRICE_MONTHLY = import.meta.env.VITE_STRIPE_PRICE_MONTHLY;
 
 export default function RegisterFinish() {
@@ -86,13 +85,7 @@ export default function RegisterFinish() {
       // 3) Filter sichern
       await saveCurrentFiltersForUser(user.uid);
 
-      // 4) ✅ Custom Double Opt-In Mail senden (nicht blockieren)
-const sendVerify = httpsCallable(functions, "sendVerifyEmail");
-sendVerify();
-
-
-
-   nav("/register/checkout-redirect", { replace: true });
+      nav("/register/checkout-redirect", { replace: true });
 
 
 
