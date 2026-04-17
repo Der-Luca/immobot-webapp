@@ -1,51 +1,78 @@
-import { useEffect, useState, Fragment } from "react";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
-import { db } from "../../../../firebase"; // Pfad ggf. anpassen
-import RenderValue from "./RenderValue";
+import { useEffect, useMemo, useState } from "react";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { Link } from "react-router-dom";
+import { db } from "@/firebase.js";
 
-// Hilfsfunktion: Fasst die Suche für die Vorschau zusammen
-function summarizeSearch(obj) {
-  if (!obj || typeof obj !== "object") return "";
-  const offerTypes = Array.isArray(obj.offerTypes) ? obj.offerTypes.join(", ") : "";
-  const objectClasses = Array.isArray(obj.objectClasses) ? obj.objectClasses.join(", ") : "";
-  const radius = obj.radiusInKm ?? obj.radius ?? "";
-  const priceFrom = obj?.priceRange?.from ?? "";
-  const priceTo = obj?.priceRange?.to ?? "";
-
-  const parts = [];
-  if (objectClasses) parts.push(objectClasses);
-  if (offerTypes) parts.push(offerTypes);
-  if (radius !== "") parts.push(`Rad: ${radius} km`);
-  if (priceFrom !== "" || priceTo !== "") parts.push(`€ ${priceFrom}–${priceTo}`);
-
-  return parts.join(" · ");
+function toDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export default function UserSearchHistory({ uid }) {
-  const [events, setEvents] = useState([]);
+function formatPrice(price) {
+  const num = Number(price);
+  if (!Number.isFinite(num) || num <= 0) return "Preis a. A.";
+
+  return new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(num);
+}
+
+export default function UserClickHistory({ uid }) {
+  const [clicks, setClicks] = useState([]);
+  const [offersById, setOffersById] = useState({});
   const [loading, setLoading] = useState(true);
+  const [openById, setOpenById] = useState({});
 
   useEffect(() => {
     if (!uid) return;
 
     const load = async () => {
+      setLoading(true);
+
       try {
-        const q = query(
-          collection(db, "searchEvents"),
-          where("uid", "==", uid),
-          orderBy("createdAt", "desc")
+        const clickQuery = query(
+          collection(db, "clickEvents"),
+          where("userId", "==", uid)
         );
 
-        const snap = await getDocs(q);
-        const data = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-          createdAtDate: d.data().createdAt?.toDate ? d.data().createdAt.toDate() : null,
-        }));
+        const clickSnap = await getDocs(clickQuery);
+        const clickData = clickSnap.docs
+          .map((d) => ({
+            id: d.id,
+            ...d.data(),
+            timestampDate: toDate(d.data().timestamp),
+          }))
+          .sort((a, b) => {
+            const aTime = a.timestampDate?.getTime() || 0;
+            const bTime = b.timestampDate?.getTime() || 0;
+            return bTime - aTime;
+          });
 
-        setEvents(data);
+        const redirectIds = [...new Set(clickData.map((c) => c.redirectId).filter(Boolean))];
+        const offerEntries = await Promise.all(
+          redirectIds.map(async (redirectId) => {
+            try {
+              const offerSnap = await getDoc(doc(db, "offerRedirects", redirectId));
+              return [
+                redirectId,
+                offerSnap.exists() ? { id: offerSnap.id, ...offerSnap.data() } : null,
+              ];
+            } catch (err) {
+              console.error("Error loading clicked offer:", redirectId, err);
+              return [redirectId, null];
+            }
+          })
+        );
+
+        setClicks(clickData);
+        setOffersById(Object.fromEntries(offerEntries));
+        setOpenById(Object.fromEntries(clickData.map((click) => [click.id, false])));
       } catch (err) {
-        console.error("Error loading search history:", err);
+        console.error("Error loading click history:", err);
       } finally {
         setLoading(false);
       }
@@ -54,119 +81,183 @@ export default function UserSearchHistory({ uid }) {
     load();
   }, [uid]);
 
+  const groupedClicks = useMemo(() => {
+    return clicks.reduce((acc, click) => {
+      const key = click.redirectId || click.id;
+      if (!acc[key]) {
+        acc[key] = {
+          redirectId: click.redirectId,
+          offer: offersById[click.redirectId] || null,
+          clicks: [],
+        };
+      }
+      acc[key].clicks.push(click);
+      return acc;
+    }, {});
+  }, [clicks, offersById]);
+
+  const setAll = (value) => {
+    setOpenById(Object.fromEntries(clicks.map((click) => [click.id, value])));
+  };
+
   if (loading) {
-    return <div className="p-4 text-sm text-gray-500 animate-pulse">Lade Such-Verlauf…</div>;
+    return <div className="p-4 text-sm text-gray-500 animate-pulse">Lade Klick-Historie...</div>;
   }
 
-  if (!events.length) {
+  if (!clicks.length) {
     return (
       <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-sm">
-        Keine Such-Historie vorhanden
+        Keine Klick-Historie vorhanden
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-      {/* Scroll-Container mit fester Höhe */}
-      <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          
-          {/* Sticky Header */}
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
-            <tr>
-              <th className="px-4 py-3 font-semibold text-xs text-gray-500 uppercase tracking-wider w-32">Zeitpunkt</th>
-              <th className="px-4 py-3 font-semibold text-xs text-gray-500 uppercase tracking-wider">Such-Parameter (Vorschau)</th>
-              <th className="px-4 py-3 font-semibold text-xs text-gray-500 uppercase tracking-wider text-right w-16">Details</th>
-            </tr>
-          </thead>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+          {clicks.length} {clicks.length === 1 ? "Klick" : "Klicks"} auf{" "}
+          {Object.keys(groupedClicks).length}{" "}
+          {Object.keys(groupedClicks).length === 1 ? "Angebot" : "Angebote"}
+        </span>
 
-          <tbody className="divide-y divide-gray-100">
-            {events.map((ev) => (
-              <SearchRow key={ev.id} ev={ev} />
-            ))}
-          </tbody>
-        </table>
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={() => setAll(true)}
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            Alle öffnen
+          </button>
+          <button
+            type="button"
+            onClick={() => setAll(false)}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            Alle schließen
+          </button>
+        </div>
+      </div>
+
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+        <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-gray-100">
+          {clicks.map((click) => {
+            const offer = offersById[click.redirectId] || null;
+            const isOpen = !!openById[click.id];
+            const title = offer?.title || "Angebot nicht gefunden";
+            const vendorName = offer?.vendor?.name || offer?.vendorName || "Unbekannter Anbieter";
+
+            return (
+              <div key={click.id} className="group bg-white transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setOpenById((prev) => ({ ...prev, [click.id]: !prev[click.id] }))}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-gray-50 transition-colors ${
+                    isOpen ? "bg-gray-50" : ""
+                  }`}
+                >
+                  <div
+                    className={`p-1.5 rounded-md text-gray-400 transition-transform duration-200 ${
+                      isOpen ? "rotate-90 text-indigo-600 bg-indigo-50" : "group-hover:text-gray-600"
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-0.5">
+                      <span className="text-xs font-bold text-gray-900">
+                        {click.timestampDate?.toLocaleTimeString("de-DE", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }) || "--:--"}
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        {click.timestampDate?.toLocaleDateString("de-DE") || ""}
+                      </span>
+                    </div>
+
+                    <div className="text-sm text-gray-700 truncate pr-4">
+                      {title}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate pr-4">
+                      {vendorName} · {click.source || "web-app"} · {formatPrice(offer?.price)}
+                    </div>
+                  </div>
+
+                  <div className="hidden sm:block">
+                    <span className="text-[10px] font-mono text-gray-300 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 group-hover:border-gray-200 group-hover:text-gray-400 transition-colors">
+                      {(click.redirectId || click.id).slice(0, 6)}
+                    </span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="px-4 pb-4 pl-[3.25rem] bg-gray-50 border-t border-gray-100">
+                    <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+                      <DetailItem label="Angebot" value={title} />
+                      <DetailItem label="Anbieter" value={vendorName} />
+                      <DetailItem label="Preis" value={formatPrice(offer?.price)} />
+                      <DetailItem label="Zimmer" value={offer?.rooms || "—"} />
+                      <DetailItem label="Redirect ID" value={click.redirectId || "—"} mono />
+                      <DetailItem label="Geomap Offer ID" value={click.geomapOfferId || offer?.id || "—"} mono />
+                      <DetailItem label="Quelle" value={click.source || "—"} />
+                      <DetailItem
+                        label="Zeitpunkt"
+                        value={click.timestampDate?.toLocaleString("de-DE") || "—"}
+                      />
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {click.redirectId && (
+                        <Link
+                          to={`/admin/offers/${click.redirectId}`}
+                          className="inline-flex items-center px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold hover:bg-indigo-100 transition-colors"
+                        >
+                          Offer im Admin öffnen
+                        </Link>
+                      )}
+
+                      {offer?.redirectUrl && (
+                        <a
+                          href={offer.redirectUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center px-3 py-2 rounded-lg bg-white text-gray-700 border border-gray-200 text-xs font-bold hover:border-gray-300 transition-colors"
+                        >
+                          Original-Anzeige öffnen
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f9fafb; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
       `}</style>
     </div>
   );
 }
 
-// Separate Komponente für die Zeile (wegen State für Auf/Zuklappen)
-function SearchRow({ ev }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // JSON Parsen
-  let parsed = null;
-  try {
-    parsed = ev.search ? JSON.parse(ev.search) : null;
-  } catch (e) {
-    parsed = { raw: ev.search };
-  }
-
-  const summary = summarizeSearch(parsed);
-
+function DetailItem({ label, value, mono = false }) {
   return (
-    <Fragment>
-      <tr 
-        onClick={() => setIsOpen(!isOpen)} 
-        className={`cursor-pointer transition-colors ${isOpen ? 'bg-indigo-50/50' : 'hover:bg-gray-50'}`}
-      >
-        {/* ZEITPUNKT */}
-        <td className="px-4 py-3 font-mono text-xs text-gray-700 align-top">
-          {ev.createdAtDate ? (
-            <div className="flex flex-col">
-              <span className="font-bold text-gray-900">
-                {ev.createdAtDate.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              <span className="text-[10px] text-gray-400">
-                {ev.createdAtDate.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              </span>
-            </div>
-          ) : (
-            <span className="text-gray-400">—</span>
-          )}
-        </td>
-
-        {/* SUMMARY */}
-        <td className="px-4 py-3 align-middle">
-          <div className="text-sm text-gray-700 truncate max-w-md">
-            {summary || <span className="text-gray-400 italic">Filter zurückgesetzt / Leer</span>}
-          </div>
-        </td>
-
-        {/* CHEVRON */}
-        <td className="px-4 py-3 text-right align-middle">
-          <button className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-indigo-600' : ''}`}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </td>
-      </tr>
-
-      {/* DETAIL ROW (wird eingeblendet) */}
-      {isOpen && (
-        <tr className="bg-gray-50 shadow-inner">
-          <td colSpan="3" className="px-4 py-4 border-b border-gray-100">
-            <div className="bg-white border border-gray-200 rounded-lg p-4 text-xs">
-              <h4 className="font-bold text-gray-500 uppercase tracking-wider mb-2 text-[10px]">Vollständige Suchdaten</h4>
-              {parsed ? (
-                <RenderValue value={parsed} />
-              ) : (
-                <span className="text-gray-400">Keine Daten verfügbar</span>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </Fragment>
+    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm min-w-0">
+      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+        {label}
+      </div>
+      <div className={`${mono ? "font-mono text-xs" : "text-sm"} text-gray-700 break-words`}>
+        {value}
+      </div>
+    </div>
   );
 }
