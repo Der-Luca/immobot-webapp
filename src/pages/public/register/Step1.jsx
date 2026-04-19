@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getState, setOfferType } from "./storage/index";
 import { toggleObjectClass } from "./storage/step1";
@@ -112,7 +112,12 @@ export default function Step1() {
         <div className="flex flex-wrap gap-2 justify-center">
           {CLASS_OPTIONS.map((opt) => {
             const active = selectedClasses.includes(opt.value);
-            const disabled = !active && selectedClasses.length >= 2;
+            const hasGrundstueck = selectedClasses.includes("Grundstueck");
+            const disabled =
+              !active &&
+              !hasGrundstueck &&
+              opt.value !== "Grundstueck" &&
+              selectedClasses.length >= 2;
 
             return (
               <button

@@ -60,6 +60,9 @@ export default function PriceCard({ filters, onChange }) {
     !filters.offerTypes?.includes("Kauf");
 
   const isGrundstueck = filters.objectClasses?.includes("Grundstueck");
+  const activeSpaceRange = isGrundstueck
+    ? filters.propertySpaceRange
+    : filters.usableSpaceRange ?? filters.propertySpaceRange;
 
   const pricePresets = useMemo(
     () => (isRentOnly ? RENT_PRESETS : BUY_PRESETS),
@@ -71,12 +74,12 @@ export default function PriceCard({ filters, onChange }) {
     : SPACE_PRESETS_APARTMENT;
 
   const [priceTo, setPriceTo] = useState(filters.priceRange?.to ?? null);
-  const [spaceRange, setSpaceRange] = useState(filters.propertySpaceRange ?? null);
+  const [spaceRange, setSpaceRange] = useState(activeSpaceRange ?? null);
 
   useEffect(() => {
     setPriceTo(filters.priceRange?.to ?? null);
-    setSpaceRange(filters.propertySpaceRange ?? null);
-  }, [filters]);
+    setSpaceRange(activeSpaceRange ?? null);
+  }, [activeSpaceRange, filters.priceRange?.to]);
 
   const enterEdit = () => setIsEditing(true);
 
@@ -107,7 +110,11 @@ export default function PriceCard({ filters, onChange }) {
     const isAny = preset.from === null && preset.to === null;
     const newRange = isAny ? null : { from: preset.from, to: preset.to };
     setSpaceRange(newRange);
-    onChange({ ...filters, propertySpaceRange: newRange });
+    onChange({
+      ...filters,
+      propertySpaceRange: isGrundstueck ? newRange : null,
+      usableSpaceRange: isGrundstueck ? null : newRange,
+    });
   };
 
   return (

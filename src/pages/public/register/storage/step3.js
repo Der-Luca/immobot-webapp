@@ -5,19 +5,30 @@ import { getState, setState } from "./index.js";
 // HELFER: Bereich speichern {from, to}
 // ---------------------------------------
 export function setSpacePreset(preset) {
+  const s = getState();
+  const isGrundstueck = s.objectClasses?.includes("Grundstueck");
+  const field = isGrundstueck ? "propertySpaceRange" : "usableSpaceRange";
+  const otherField = isGrundstueck ? "usableSpaceRange" : "propertySpaceRange";
+
   if (preset === null) {
     // beliebig
-    return setState({ propertySpaceRange: undefined });
+    return setState({ [field]: undefined, [otherField]: undefined });
   }
 
   if (preset.type === "max") {
     // bis X
-    return setState({ propertySpaceRange: { from: 0, to: preset.value } });
+    return setState({
+      [field]: { from: 0, to: preset.value },
+      [otherField]: undefined,
+    });
   }
 
   if (preset.type === "min") {
     // ab X
-    return setState({ propertySpaceRange: { from: preset.value, to: 9999999 } });
+    return setState({
+      [field]: { from: preset.value, to: 9999999 },
+      [otherField]: undefined,
+    });
   }
 }
 

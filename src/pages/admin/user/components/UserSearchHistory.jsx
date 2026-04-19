@@ -3,6 +3,25 @@ import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "@/firebase.js";
 import RenderValue from "./RenderValue";
 
+function toDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  if (typeof value.seconds === "number") return new Date(value.seconds * 1000);
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function dayKey(date) {
+  if (!date) return null;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 // Hilfsfunktion zum Zusammenfassen des Such-Objekts für die Vorschau
 function summarizeSearch(obj) {
   if (!obj || typeof obj !== "object") return "";
@@ -25,6 +44,7 @@ function summarizeSearch(obj) {
 
 export default function UserSearchHistory({ uid }) {
   const [events, setEvents] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openById, setOpenById] = useState({}); // { [id]: boolean }
 
@@ -38,15 +58,28 @@ export default function UserSearchHistory({ uid }) {
           where("uid", "==", uid),
           orderBy("createdAt", "desc")
         );
+        const offersQuery = query(
+          collection(db, "offerRedirects"),
+          where("uid", "==", uid)
+        );
 
-        const snap = await getDocs(q);
+        const [snap, offerSnap] = await Promise.all([
+          getDocs(q),
+          getDocs(offersQuery),
+        ]);
         const data = snap.docs.map((d) => ({
           id: d.id,
           ...d.data(),
-          createdAtDate: d.data().createdAt?.toDate ? d.data().createdAt.toDate() : null,
+          createdAtDate: toDate(d.data().createdAt),
+        }));
+        const offerData = offerSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+          createdAtDate: toDate(d.data().createdAt),
         }));
 
         setEvents(data);
+        setOffers(offerData);
         
         // Standard: alle geschlossen
         const initial = {};
@@ -62,6 +95,16 @@ export default function UserSearchHistory({ uid }) {
 
     load();
   }, [uid]);
+
+  const resultCountByDay = useMemo(() => {
+    return offers.reduce((acc, offer) => {
+      const key = dayKey(offer.createdAtDate);
+      if (!key) return acc;
+
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  }, [offers]);
 
   const setAll = (value) => {
     const next = {};
@@ -114,13 +157,16 @@ export default function UserSearchHistory({ uid }) {
           {events.map((ev) => {
             let parsed = null;
             try {
-              parsed = ev.search ? JSON.parse(ev.search) : null;
-            } catch (e) {
+              parsed = typeof ev.search === "string"
+                ? JSON.parse(ev.search)
+                : ev.search || null;
+            } catch {
               parsed = { raw: ev.search };
             }
 
             const isOpen = !!openById[ev.id];
             const summary = summarizeSearch(parsed);
+            const resultCount = resultCountByDay[dayKey(ev.createdAtDate)] || 0;
 
             return (
               <div key={ev.id} className="group bg-white transition-colors">
@@ -154,6 +200,13 @@ export default function UserSearchHistory({ uid }) {
                     </div>
                   </div>
 
+                  {/* Result Count */}
+                  <div className="hidden sm:block">
+                    <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                      {resultCount} {resultCount === 1 ? "Ergebnis" : "Ergebnisse"}
+                    </span>
+                  </div>
+
                   {/* ID Badge */}
                   <div className="hidden sm:block">
                      <span className="text-[10px] font-mono text-gray-300 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 group-hover:border-gray-200 group-hover:text-gray-400 transition-colors">
@@ -165,6 +218,9 @@ export default function UserSearchHistory({ uid }) {
                 {/* ACCORDION BODY */}
                 {isOpen && (
                   <div className="px-4 pb-4 pl-[3.25rem] bg-gray-50 border-t border-gray-100">
+                    <div className="mt-3 mb-3 inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 sm:hidden">
+                      {resultCount} {resultCount === 1 ? "Ergebnis" : "Ergebnisse"} am gleichen Tag
+                    </div>
                     <div className="mt-3 text-sm bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                       {parsed ? (
                         <RenderValue value={parsed} />

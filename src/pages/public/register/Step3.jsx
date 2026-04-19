@@ -32,25 +32,28 @@ export default function Step3() {
 
   const pricePresets = getPricePresets();
   const spacePresets = getSpacePresets();
+  const isGrundstueck = initial.objectClasses?.includes("Grundstueck");
+  const initialSpaceRange = isGrundstueck
+    ? initial.propertySpaceRange
+    : initial.usableSpaceRange ?? initial.propertySpaceRange;
 
   const [priceTo, setPriceTo] = useState(initial.priceRange?.to ?? null);
- const [spacePreset, setSpacePresetState] = useState(() => {
-  const r = initial.propertySpaceRange;
-  if (!r) return null;
+  const [spacePreset, setSpacePresetState] = useState(() => {
+    const r = initialSpaceRange;
+    if (!r) return null;
 
-  if (r.from === 0 && r.to != null) {
-    return { type: "max", value: r.to };
-  }
+    if (r.from === 0 && r.to != null) {
+      return { type: "max", value: r.to };
+    }
 
-  if (r.from != null && r.to === 9999999) {
-    return { type: "min", value: r.from };
-  }
+    if (r.from != null && r.to === 9999999) {
+      return { type: "min", value: r.from };
+    }
 
-  return null;
-});
+    return null;
+  });
 
 
-  const isGrundstueck = initial.objectClasses?.includes("Grundstueck");
   const isMieteOnly =
     initial.offerTypes?.includes("Miete") &&
     !initial.offerTypes?.includes("Kauf");

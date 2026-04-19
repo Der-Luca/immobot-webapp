@@ -65,11 +65,17 @@ export default function ObjectCard({ filters, onChange }) {
     if (!isEditing) return;
 
     const active = objectClasses.includes(value);
-    if (!active && objectClasses.length >= 2) return; // 🔒 max 2
+    let nextClasses;
 
-    const nextClasses = active
-      ? objectClasses.filter((v) => v !== value)
-      : [...objectClasses, value];
+    if (active) {
+      nextClasses = objectClasses.filter((v) => v !== value);
+    } else if (value === "Grundstueck") {
+      nextClasses = ["Grundstueck"];
+    } else {
+      const currentWithoutPlot = objectClasses.filter((v) => v !== "Grundstueck");
+      if (currentWithoutPlot.length >= 2) return; // 🔒 max 2
+      nextClasses = [...currentWithoutPlot, value];
+    }
 
     const nextCategories = deriveCategories(nextClasses);
 
@@ -173,7 +179,12 @@ export default function ObjectCard({ filters, onChange }) {
             <div className="flex flex-wrap gap-3">
               {OBJECT_CLASSES.map((o) => {
                 const active = objectClasses.includes(o.value);
-                const disabled = !active && objectClasses.length >= 2;
+                const hasGrundstueck = objectClasses.includes("Grundstueck");
+                const disabled =
+                  !active &&
+                  !hasGrundstueck &&
+                  o.value !== "Grundstueck" &&
+                  objectClasses.length >= 2;
 
                 return (
                   <button

@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { db } from "@/firebase.js";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  writeBatch,
+} from "firebase/firestore";
 
 // Sub-Komponenten (Vorhandene Logik behalten, nur Container stylen)
 import RenderValue from "./components/RenderValue";
@@ -11,10 +20,13 @@ import UserClickHistory from "./components/UserClickHistory";
 
 export default function AdminUserDetails() {
   const { uid } = useParams();
+  const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dangerAction, setDangerAction] = useState(null);
+  const [dangerMessage, setDangerMessage] = useState(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -38,6 +50,83 @@ export default function AdminUserDetails() {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     // Optional: Toast Notification hier
+  };
+
+  const deleteDocsInBatches = async (docs) => {
+    let deleted = 0;
+
+    for (let i = 0; i < docs.length; i += 450) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + 450);
+
+      chunk.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
+
+      await batch.commit();
+      deleted += chunk.length;
+    }
+
+    return deleted;
+  };
+
+  const handleDeleteResults = async () => {
+    if (!user?.uid || dangerAction) return;
+
+    setDangerAction("results");
+    setDangerMessage(null);
+
+    try {
+      const resultQuery = query(
+        collection(db, "offerRedirects"),
+        where("uid", "==", user.uid)
+      );
+      const snap = await getDocs(resultQuery);
+      const count = snap.size;
+
+      const confirmed = window.confirm(
+        `Willst du wirklich alle ${count} Ergebnisse von ${email} löschen? Diese Aktion kann nicht rückgängig gemacht werden.`
+      );
+
+      if (!confirmed) {
+        setDangerMessage("Ergebnis-Löschung abgebrochen.");
+        return;
+      }
+
+      const deleted = await deleteDocsInBatches(snap.docs);
+      setDangerMessage(`${deleted} Ergebnisse gelöscht.`);
+    } catch (err) {
+      console.error("Error deleting user results:", err);
+      setDangerMessage("Fehler beim Löschen der Ergebnisse.");
+    } finally {
+      setDangerAction(null);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!user?.uid || dangerAction) return;
+
+    const confirmed = window.confirm(
+      `Willst du wirklich den User ${email} löschen? Das löscht das Firestore-Userprofil, aber nicht automatisch das Firebase-Auth-Konto.`
+    );
+
+    if (!confirmed) {
+      setDangerMessage("User-Löschung abgebrochen.");
+      return;
+    }
+
+    setDangerAction("user");
+    setDangerMessage(null);
+
+    try {
+      await deleteDoc(doc(db, "users", user.uid));
+      navigate("/admin/users", { replace: true });
+    } catch (err) {
+      console.error("Error deleting user:", err);
+      setDangerMessage("Fehler beim Löschen des Users.");
+    } finally {
+      setDangerAction(null);
+    }
   };
 
   if (loading) return <div className="p-10 text-center animate-pulse text-gray-500">Lade Profil...</div>;
@@ -170,6 +259,35 @@ export default function AdminUserDetails() {
                 </div>
               ) : (
                 <div className="text-sm text-gray-400 italic">Kein Filter gesetzt.</div>
+              )}
+            </div>
+
+            {/* 3. GEFAHRENZONE */}
+            <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6">
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleDeleteResults}
+                  disabled={Boolean(dangerAction)}
+                  className="w-full px-4 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm font-bold hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {dangerAction === "results" ? "Lösche Ergebnisse..." : "Alle Ergebnisse löschen"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteUser}
+                  disabled={Boolean(dangerAction)}
+                  className="w-full px-4 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm font-bold hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {dangerAction === "user" ? "Lösche User..." : "User löschen"}
+                </button>
+              </div>
+
+              {dangerMessage && (
+                <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  {dangerMessage}
+                </div>
               )}
             </div>
           </div>
