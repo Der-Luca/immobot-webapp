@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
-import { doc, updateDoc, deleteField } from "firebase/firestore";
-import { functions, db } from "../../firebase";
+import { functions } from "../../firebase";
 import usePaymentStatus from "./usePaymentStatus";
 import PaymentOverlay from "./PaymentOverlay";
 import ReactivateOverlay from "./ReactivateOverlay";
@@ -28,13 +27,21 @@ export default function RequirePayment({ children }) {
   const [error, setError] = useState("");
   const [pendingTired, setPendingTired] = useState(false);
 
+  const resetCheckout = useCallback(async () => {
+    if (!user) return;
+    const resetCheckoutStatus = httpsCallable(functions, "resetCheckoutStatus");
+    await resetCheckoutStatus();
+  }, [user]);
+
   // Stripe cancel_url → ?checkout=cancel → stripeStatus zurücksetzen
   useEffect(() => {
     if (searchParams.get("checkout") === "cancel" && user) {
-      updateDoc(doc(db, "users", user.uid), { stripeStatus: deleteField() });
+      resetCheckout().catch((err) => {
+        console.error("Checkout-Status konnte nicht zurückgesetzt werden", err);
+      });
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, user, setSearchParams]);
+  }, [searchParams, user, setSearchParams, resetCheckout]);
 
   // Timeout: nach 10 Sek. Hinweis, nach 30 Sek. Auto-Reset
   useEffect(() => {
@@ -48,12 +55,7 @@ export default function RequirePayment({ children }) {
       clearTimeout(tiredTimer);
       clearTimeout(resetTimer);
     };
-  }, [isPending]);
-
-  async function resetCheckout() {
-    if (!user) return;
-    await updateDoc(doc(db, "users", user.uid), { stripeStatus: deleteField() });
-  }
+  }, [isPending, resetCheckout]);
 
   async function startCheckout() {
     setError("");
