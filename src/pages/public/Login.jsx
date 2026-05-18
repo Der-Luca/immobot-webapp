@@ -70,28 +70,31 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-sky-50 via-white to-sky-100 px-4">
-      {/* Farbige Blobs im Hintergrund */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-24 h-80 w-80 rounded-full bg-sky-300/50 blur-3xl" />
-        <div className="absolute bottom-[-60px] -right-10 h-80 w-80 rounded-full bg-indigo-300/50 blur-3xl" />
-        <div className="absolute top-1/2 -right-24 h-64 w-64 -translate-y-1/2 rounded-full bg-emerald-200/60 blur-3xl" />
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-950 px-4 py-10">
+      <div className="pointer-events-none fixed inset-0">
+        <img
+          src="/login-background.jpg"
+          alt=""
+          className="h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-slate-950/55" />
+        <div className="absolute inset-0 bg-linear-to-r from-slate-950/40 via-transparent to-slate-950/30" />
       </div>
 
       <div className="relative z-10 w-full max-w-md">
         {/* Branding / Header */}
         <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600 border border-slate-200 shadow-sm">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600 border border-white/70 shadow-sm">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-500 text-[9px] font-bold text-white">
               I
             </span>
             <span>Immobot • Login</span>
           </div>
 
-          <h1 className="mt-4 text-3xl font-semibold text-slate-900">
+          <h1 className="mt-4 text-3xl font-semibold text-white">
             Willkommen zurück
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-slate-100">
             Melde dich an, um deine Immobot-Suche und gespeicherten Filter fortzusetzen.
           </p>
         </div>
@@ -190,7 +193,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-slate-400">
+        <p className="mt-6 text-center text-[11px] text-slate-200">
           Mit dem Login akzeptierst du unsere Nutzungsbedingungen & Datenschutzerklärung.
         </p>
       </div>
