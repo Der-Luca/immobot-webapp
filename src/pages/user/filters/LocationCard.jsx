@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import FilterFrame from "./FilterFrame";
+import CookieConsentNotice from "@/components/CookieConsentNotice.jsx";
+import { useCookieConsent } from "@/hooks/useCookieConsent";
 
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -7,6 +9,7 @@ const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 const RADIUS_OPTIONS = [5, 7.5, 10, 12.5, 15];
 
 export default function LocationCard({ filters, onChange }) {
+  const { accepted: cookiesAccepted, acceptCookies } = useCookieConsent();
   const [isEditing, setIsEditing] = useState(false);
 
 
@@ -63,6 +66,11 @@ useEffect(() => {
 
 
   async function searchAddress(q) {
+    if (!cookiesAccepted) {
+      setSuggestions([]);
+      return;
+    }
+
     if (!q || q.length < 3) {
       setSuggestions([]);
       return;
@@ -99,6 +107,14 @@ useEffect(() => {
   /* ---------------- Map ---------------- */
 
   useEffect(() => {
+    if (!cookiesAccepted) {
+      if (leafletRef.current.map) {
+        leafletRef.current.map.remove();
+        leafletRef.current = { map: null, marker: null, circle: null };
+      }
+      return;
+    }
+
     let cancelled = false;
 
     async function loadLeaflet() {
@@ -159,7 +175,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [lat, lon, radius]);
+  }, [lat, lon, radius, cookiesAccepted]);
 
   /* ---------------- Chip Style ---------------- */
 
@@ -254,11 +270,12 @@ useEffect(() => {
                 </label>
                 <input
                   value={address}
+                  disabled={!cookiesAccepted}
                   onChange={(e) => {
                     setAddress(e.target.value);
                     searchAddress(e.target.value);
                   }}
-                  className="w-full rounded-xl border-gray-300 bg-gray-50 px-4 py-3 text-sm"
+                  className="w-full rounded-xl border-gray-300 bg-gray-50 px-4 py-3 text-sm disabled:text-gray-400"
                   placeholder="z.B. Berlin Alexanderplatz"
                 />
 
@@ -287,7 +304,7 @@ useEffect(() => {
                     <button
                       key={km}
                       type="button"
-                      disabled={!isEditing}
+                      disabled={!isEditing || !cookiesAccepted}
                       onClick={() => setRadius(km)}
                       className={chipClass(radius === km)}
                     >
@@ -306,12 +323,21 @@ useEffect(() => {
     isEditing ? "h-64" : "h-[420px] md:h-[480px]"
   }`}
 >
-            <div ref={mapRef} className="h-full w-full bg-gray-100" />
+            {cookiesAccepted ? (
+              <div ref={mapRef} className="h-full w-full bg-gray-100" />
+            ) : (
+              <CookieConsentNotice
+                onAccept={acceptCookies}
+                className="h-full rounded-none border-0"
+                compact
+                text="Für das volle Immobot-Erlebnis benötigen wir deine Zustimmung."
+              />
+            )}
           </div>
         </div>
 
         {/* Click-anywhere Overlay */}
-        {!isEditing && (
+        {!isEditing && cookiesAccepted && (
           <button
             type="button"
             onClick={enterEdit}

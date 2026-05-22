@@ -5,6 +5,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../../../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { saveCurrentFiltersForUser } from "./storage/saveFilters";
+import { buildCookieConsentPayload } from "@/lib/cookieConsent";
 const PRICE_MONTHLY = import.meta.env.VITE_STRIPE_PRICE_MONTHLY;
 
 export default function RegisterFinish() {
@@ -59,26 +60,36 @@ export default function RegisterFinish() {
       );
 
       // 2) Firestore-Profil
+      const cookieConsent = buildCookieConsentPayload();
+      const profileData = {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        role: "user",
+        initialSearch: false,
+        initialMail: false,
+        // Stripe defaults (keine "none"-Falle)
+        stripeStatus: "none",
+        stripeCustomerId: null,
+
+        // Custom Double Opt-In
+        customEmailVerified: false,
+        allowMail: true,
+        marketingOptIn,
+        acceptedTermsAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      };
+
+      if (cookieConsent) {
+        profileData.cookieConsent = {
+          ...cookieConsent,
+          syncedAt: serverTimestamp(),
+        };
+      }
+
       await setDoc(
         doc(db, "users", user.uid),
-        {
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          email: email.trim().toLowerCase(),
-          role: "user",
-          initialSearch: false,
-          initialMail: false,
-          // Stripe defaults (keine "none"-Falle)
-          stripeStatus: "none",
-          stripeCustomerId: null,
-
-          // Custom Double Opt-In
-          customEmailVerified: false,
-          allowMail: true,
-          marketingOptIn,
-          acceptedTermsAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        },
+        profileData,
         { merge: true }
       );
 

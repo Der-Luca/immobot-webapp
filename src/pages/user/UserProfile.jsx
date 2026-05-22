@@ -11,10 +11,17 @@ import {
 
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase.js";
+import { useCookieConsent } from "@/hooks/useCookieConsent";
 
 export default function UserProfile() {
   const { user, logout } = useAuth();
   const auth = useMemo(() => getAuth(), []);
+  const {
+    accepted: cookiesAccepted,
+    loading: cookieConsentLoading,
+    acceptCookies,
+    revokeCookies,
+  } = useCookieConsent();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +46,7 @@ export default function UserProfile() {
   // Mail toggle
   const [allowMail, setAllowMail] = useState(false);
   const [savingMail, setSavingMail] = useState(false);
+  const [savingCookies, setSavingCookies] = useState(false);
 
   // Billing address
   const [billingAddress, setBillingAddress] = useState({
@@ -167,7 +175,7 @@ export default function UserProfile() {
       await fbUpdateEmail(auth.currentUser, newEmail);
       await updateDoc(doc(db, "users", user.uid), { email: newEmail });
       setNotice("E-Mail-Adresse aktualisiert.");
-    } catch (e) {
+    } catch {
       setError(
         "Aus Sicherheitsgründen ist ein erneutes Einloggen erforderlich, um die E-Mail zu ändern."
       );
@@ -250,6 +258,20 @@ export default function UserProfile() {
       setError("Einstellung konnte nicht gespeichert werden.");
     } finally {
       setSavingMail(false);
+    }
+  }
+
+  async function toggleCookieConsent() {
+    setSavingCookies(true);
+    setError("");
+
+    try {
+      if (cookiesAccepted) await revokeCookies();
+      else await acceptCookies();
+    } catch {
+      setError("Cookie-Einstellung konnte nicht gespeichert werden.");
+    } finally {
+      setSavingCookies(false);
     }
   }
 
@@ -508,6 +530,44 @@ export default function UserProfile() {
                       pointer-events-none inline-block h-6 w-6 transform rounded-full
                       bg-white shadow-lg ring-0 transition duration-200 ease-in-out
                       ${allowMail ? "translate-x-5" : "translate-x-0"}
+                    `}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Cookies */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <h2 className="font-bold text-gray-900 mb-4">Cookies</h2>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    Karten & Adresssuche
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Ohne Zustimmung bleiben Karten und Standortsuche deaktiviert
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={toggleCookieConsent}
+                  disabled={savingCookies || cookieConsentLoading}
+                  className={`
+                    relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full
+                    border-2 border-transparent transition-colors duration-200 ease-in-out
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    ${cookiesAccepted ? "bg-blue-600" : "bg-gray-200"}
+                  `}
+                  aria-label="Cookie-Einstellung ändern"
+                >
+                  <span
+                    className={`
+                      pointer-events-none inline-block h-6 w-6 transform rounded-full
+                      bg-white shadow-lg ring-0 transition duration-200 ease-in-out
+                      ${cookiesAccepted ? "translate-x-5" : "translate-x-0"}
                     `}
                   />
                 </button>

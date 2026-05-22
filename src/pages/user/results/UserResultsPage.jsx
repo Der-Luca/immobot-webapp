@@ -4,6 +4,7 @@ import { db } from "@/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import ResultsMap from "./ResultsMap";
 import ResultsList from "./ResultsList";
+import { useCookieConsent } from "@/hooks/useCookieConsent";
 
 export default function UserResultsPage() {
   const { user } = useAuth();
@@ -13,6 +14,7 @@ export default function UserResultsPage() {
   const [highlightedId, setHighlightedId] = useState(null);
   const [selectedMapId, setSelectedMapId] = useState(null);
   const [toast, setToast] = useState(null);
+  const { accepted: cookiesAccepted, acceptCookies } = useCookieConsent();
 
   // Handler wenn Item in der Liste geklickt wird
   const handleItemClick = (docId, hasLocation) => {
@@ -99,6 +101,8 @@ export default function UserResultsPage() {
               offers={offers}
               onMarkerClick={setHighlightedId}
               selectedId={selectedMapId}
+              cookiesAccepted={cookiesAccepted}
+              onAcceptCookies={acceptCookies}
             />
           </div>
 

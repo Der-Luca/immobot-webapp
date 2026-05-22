@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getState } from "./storage/index.js";
 import { setCoordinate, setRadiusInKm, setAddress } from "./storage/step2.js";
+import CookieConsentNotice from "@/components/CookieConsentNotice.jsx";
+import { acceptLocalCookies, hasAcceptedCookies } from "@/lib/cookieConsent.js";
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 const RADIUS_PRESETS = [5, 7.5, 10, 12.5, 15];
@@ -9,14 +11,18 @@ const RADIUS_PRESETS = [5, 7.5, 10, 12.5, 15];
 export default function Step2() {
   const navigate = useNavigate();
   const initial = useMemo(() => getState(), []);
+  const initialLat = initial.coordinate?.lat;
+  const initialLon = initial.coordinate?.lon;
+  const initialRadius = initial.radiusInKm ?? 10;
 
   const [query, setQuery] = useState(initial.address || "");
   const [suggestions, setSuggestions] = useState([]);
-  const [radius, setRadius] = useState(initial.radiusInKm ?? 10);
+  const [radius, setRadius] = useState(initialRadius);
   const [selectedCoordinate, setSelectedCoordinate] = useState(
     initial.coordinate ?? null
   );
   const [error, setError] = useState("");
+  const [cookiesAccepted, setCookiesAccepted] = useState(hasAcceptedCookies());
 
   const [hasUserTyped, setHasUserTyped] = useState(false);
 
@@ -24,9 +30,39 @@ export default function Step2() {
   const leafletRef = useRef({ L: null, map: null, marker: null, circle: null });
 
   // ------------------------------------------------------------
+  // Marker + Radius zeichnen
+  // ------------------------------------------------------------
+  const drawMarkerAndCircle = useCallback(
+    (lat, lon, rKm) => {
+      if (!cookiesAccepted) return;
+
+      const { L, map, marker, circle } = leafletRef.current;
+      if (!L || !map) return;
+
+      if (marker) marker.remove();
+      if (circle) circle.remove();
+
+      const m = L.marker([lat, lon]).addTo(map);
+      const c = L.circle([lat, lon], {
+        radius: (rKm || 0) * 1000,
+        color: "#007bff",
+        fillOpacity: 0.25,
+      }).addTo(map);
+
+      leafletRef.current.marker = m;
+      leafletRef.current.circle = c;
+
+      map.fitBounds(c.getBounds(), { padding: [40, 40] });
+    },
+    [cookiesAccepted]
+  );
+
+  // ------------------------------------------------------------
   // Leaflet initialisieren (statisch, locked)
   // ------------------------------------------------------------
   useEffect(() => {
+    if (!cookiesAccepted) return;
+
     let cancelled = false;
 
     const ensureLeaflet = async () => {
@@ -71,19 +107,21 @@ export default function Step2() {
         { attribution: "&copy; MapTiler" }
       ).addTo(map);
 
-      if (initial.coordinate?.lat && initial.coordinate?.lon) {
-        drawMarkerAndCircle(
-          initial.coordinate.lat,
-          initial.coordinate.lon,
-          radius
-        );
+      if (initialLat && initialLon) {
+        drawMarkerAndCircle(initialLat, initialLon, initialRadius);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    cookiesAccepted,
+    drawMarkerAndCircle,
+    initialLat,
+    initialLon,
+    initialRadius,
+  ]);
 
   // ------------------------------------------------------------
   // Radius ändern
@@ -96,12 +134,14 @@ export default function Step2() {
       const p = marker.getLatLng();
       drawMarkerAndCircle(p.lat, p.lng, radius);
     }
-  }, [radius]);
+  }, [drawMarkerAndCircle, radius]);
 
   // ------------------------------------------------------------
   // AUTOCOMPLETE – NUR wenn User tippt
   // ------------------------------------------------------------
   useEffect(() => {
+    if (!cookiesAccepted) return;
+
     if (!hasUserTyped) {
       setSuggestions([]);
       return;
@@ -138,12 +178,14 @@ export default function Step2() {
     }, 200);
 
     return () => clearTimeout(t);
-  }, [query, hasUserTyped]);
+  }, [query, hasUserTyped, cookiesAccepted]);
 
   // ------------------------------------------------------------
   // Auswahl aus Dropdown
   // ------------------------------------------------------------
   function onPickSuggestion(item) {
+    if (!cookiesAccepted) return;
+
     setQuery(item.label);
     setSuggestions([]);
     setHasUserTyped(false); // 🔑 Dropdown wieder deaktivieren
@@ -155,27 +197,37 @@ export default function Step2() {
     drawMarkerAndCircle(item.lat, item.lon, radius);
   }
 
-  // ------------------------------------------------------------
-  // Marker + Radius zeichnen
-  // ------------------------------------------------------------
-  function drawMarkerAndCircle(lat, lon, rKm) {
-    const { L, map, marker, circle } = leafletRef.current;
-    if (!L || !map) return;
+  if (!cookiesAccepted) {
+    return (
+      <div className="
+        w-full mx-auto max-w-2xl bg-white space-y-6 md:space-y-8
+        p-4 mt-2
+        md:p-6 md:mt-10 md:w-2/3
+      ">
+        <p className="text-center text-xs md:text-sm text-gray-500">
+          Schritt 2 von 5
+        </p>
 
-    if (marker) marker.remove();
-    if (circle) circle.remove();
+        <CookieConsentNotice
+          onAccept={() => {
+            acceptLocalCookies();
+            setCookiesAccepted(true);
+          }}
+          title="Wir nutzen Cookies"
+          text="Für das volle Immobot-Erlebnis benötigen wir deine Zustimmung."
+          className="bg-blue-50"
+        />
 
-    const m = L.marker([lat, lon]).addTo(map);
-    const c = L.circle([lat, lon], {
-      radius: (rKm || 0) * 1000,
-      color: "#007bff",
-      fillOpacity: 0.25,
-    }).addTo(map);
-
-    leafletRef.current.marker = m;
-    leafletRef.current.circle = c;
-
-    map.fitBounds(c.getBounds(), { padding: [40, 40] });
+        <div className="flex justify-start">
+          <button
+            className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
+            onClick={() => navigate("/register/step1")}
+          >
+            &lt; Zurück
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // ------------------------------------------------------------
@@ -203,6 +255,7 @@ export default function Step2() {
 
         <input
           value={query}
+          disabled={!cookiesAccepted}
           onChange={(e) => {
             setQuery(e.target.value);
             setHasUserTyped(true); // 🔑 erst jetzt Autocomplete
@@ -211,7 +264,7 @@ export default function Step2() {
             setCoordinate(undefined);
           }}
           placeholder="z. B. Freiburg im Breisgau"
-          className="w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          className="w-full rounded-lg border border-gray-300 px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
           }}
@@ -244,6 +297,7 @@ export default function Step2() {
               key={km}
               type="button"
               onClick={() => setRadius(km)}
+              disabled={!cookiesAccepted}
               className={`px-3 py-2 md:px-4 rounded-full border text-sm transition ${
                 Number(radius) === km
                   ? "bg-blue-600 text-white border-blue-600"
@@ -261,7 +315,13 @@ export default function Step2() {
         className="w-full h-64 md:h-[400px] rounded-xl border border-gray-300 overflow-hidden"
         style={{ pointerEvents: "none" }}
       >
-        <div ref={mapRef} className="w-full h-full" />
+        {cookiesAccepted ? (
+          <div ref={mapRef} className="w-full h-full" />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-gray-100 px-4 text-center text-sm text-gray-500">
+            Karte erst nach Cookie-Zustimmung verfügbar.
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
@@ -289,6 +349,11 @@ export default function Step2() {
               : "bg-gray-300 text-gray-600 cursor-not-allowed"
           }`}
           onClick={() => {
+            if (!cookiesAccepted) {
+              setError("Bitte zuerst Cookies akzeptieren.");
+              setTimeout(() => setError(""), 2500);
+              return;
+            }
             if (!selectedCoordinate) {
               setError("Bitte eine Ortschaft aus der Liste auswählen.");
               setTimeout(() => setError(""), 2500);

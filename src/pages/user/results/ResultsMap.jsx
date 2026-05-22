@@ -1,10 +1,17 @@
 import { useEffect, useRef } from "react";
+import CookieConsentNotice from "@/components/CookieConsentNotice.jsx";
 
 // ✅ Hier holen wir den Key sicher aus der .env Datei
 // Falls du nicht Vite nutzt, sondern Create-React-App, nutze process.env.REACT_APP_MAPTILER_KEY
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
-export default function ResultsMap({ offers = [], onMarkerClick, selectedId }) {
+export default function ResultsMap({
+  offers = [],
+  onMarkerClick,
+  selectedId,
+  cookiesAccepted,
+  onAcceptCookies,
+}) {
   const mapRef = useRef(null);
   const leafletRef = useRef({ map: null, L: null, markers: {} });
   const onMarkerClickRef = useRef(onMarkerClick);
@@ -15,6 +22,14 @@ export default function ResultsMap({ offers = [], onMarkerClick, selectedId }) {
   }, [onMarkerClick]);
 
   useEffect(() => {
+    if (!cookiesAccepted) {
+      if (leafletRef.current.map) {
+        leafletRef.current.map.remove();
+        leafletRef.current = { map: null, L: null, markers: {} };
+      }
+      return;
+    }
+
     let cancelled = false;
 
     async function ensureLeaflet() {
@@ -101,10 +116,11 @@ export default function ResultsMap({ offers = [], onMarkerClick, selectedId }) {
 
     init();
     return () => (cancelled = true);
-  }, [offers]);
+  }, [offers, cookiesAccepted]);
 
   // Marker hervorheben wenn von der Liste ausgewählt
   useEffect(() => {
+    if (!cookiesAccepted) return;
     if (!selectedId) return;
     const marker = leafletRef.current.markers[selectedId];
     const map = leafletRef.current.map;
@@ -114,7 +130,18 @@ export default function ResultsMap({ offers = [], onMarkerClick, selectedId }) {
       // Popup erst nach der Animation öffnen, damit setView nicht überschrieben wird
       setTimeout(() => marker.openPopup(), 300);
     }
-  }, [selectedId]);
+  }, [selectedId, cookiesAccepted]);
+
+  if (!cookiesAccepted) {
+    return (
+      <CookieConsentNotice
+        onAccept={onAcceptCookies}
+        className="h-full rounded-2xl"
+        compact
+        text="Für das volle Immobot-Erlebnis benötigen wir deine Zustimmung."
+      />
+    );
+  }
 
   return (
     <div

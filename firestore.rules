@@ -1,0 +1,142 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function protectedUserFields() {
+      return [
+        "role",
+        "createdAt",
+        "acceptedTermsAt",
+        "customEmailVerified",
+        "emailVerified",
+        "emailVerifiedAt",
+        "stripeStatus",
+        "stripeCustomerId",
+        "stripeSubscriptionId",
+        "stripeSubscriptionStatus",
+        "stripeCancelAtPeriodEnd",
+        "stripeCheckoutSessionId",
+        "stripeLastPayment",
+        "stripeLastPaymentError",
+        "cancelSubscriptionToken",
+        "cancelSubscriptionTokenExpiresAt",
+        "cancelSubscriptionTokenUsedAt",
+        "cancelSubscriptionRequestedAt",
+        "cancelSubscriptionConfirmedAt"
+      ];
+    }
+
+    function validUserCreate(uid) {
+      return isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          "firstName",
+          "lastName",
+          "email",
+          "role",
+          "initialSearch",
+          "initialMail",
+          "stripeStatus",
+          "stripeCustomerId",
+          "customEmailVerified",
+          "allowMail",
+          "marketingOptIn",
+          "acceptedTermsAt",
+          "createdAt",
+          "cookieConsent",
+          "lastSearch",
+          "lastSearchUpdatedAt"
+        ])
+        && request.resource.data.role == "user"
+        && request.resource.data.stripeStatus == "none"
+        && request.resource.data.stripeCustomerId == null
+        && request.resource.data.customEmailVerified == false;
+    }
+
+    function validUserUpdate(uid) {
+      return isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedUserFields());
+    }
+
+    // =========================
+    //  Users
+    // =========================
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if validUserCreate(uid) || isAdmin();
+      allow update: if validUserUpdate(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // =========================
+    //  User Search Filters
+    // =========================
+    match /users/{uid}/searchFilters/{filterId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // =========================
+    //  SearchEvents
+    // =========================
+    match /searchEvents/{id} {
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.uid == request.auth.uid
+        );
+
+      allow create: if isSignedIn()
+        && (
+          isAdmin()
+          || request.resource.data.uid == request.auth.uid
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // =========================
+    //  ClickEvents
+    // =========================
+    match /clickEvents/{id} {
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.userId == request.auth.uid
+        );
+
+      allow create: if isSignedIn()
+        && (
+          !("userId" in request.resource.data)
+          || request.resource.data.userId == request.auth.uid
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // =========================
+    //  OfferRedirects
+    // =========================
+    match /offerRedirects/{id} {
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.uid == request.auth.uid
+        );
+
+      allow write: if isAdmin();
+    }
+  }
+}
