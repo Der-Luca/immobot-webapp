@@ -115,12 +115,6 @@ export default function UserClickHistory({ uid }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-          {clicks.length} {clicks.length === 1 ? "Klick" : "Klicks"} auf{" "}
-          {Object.keys(groupedClicks).length}{" "}
-          {Object.keys(groupedClicks).length === 1 ? "Angebot" : "Angebote"}
-        </span>
-
         <div className="flex gap-4">
           <button
             type="button"
@@ -137,6 +131,12 @@ export default function UserClickHistory({ uid }) {
             Alle schließen
           </button>
         </div>
+
+        <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+          {clicks.length} {clicks.length === 1 ? "Klick" : "Klicks"} auf{" "}
+          {Object.keys(groupedClicks).length}{" "}
+          {Object.keys(groupedClicks).length === 1 ? "Angebot" : "Angebote"}
+        </span>
       </div>
 
       <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">

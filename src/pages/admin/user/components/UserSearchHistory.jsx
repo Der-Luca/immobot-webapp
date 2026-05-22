@@ -106,6 +106,12 @@ export default function UserSearchHistory({ uid }) {
     }, {});
   }, [offers]);
 
+  const totalVisibleResults = useMemo(() => {
+    return events.reduce((sum, ev) => {
+      return sum + (resultCountByDay[dayKey(ev.createdAtDate)] || 0);
+    }, 0);
+  }, [events, resultCountByDay]);
+
   const setAll = (value) => {
     const next = {};
     events.forEach((ev) => (next[ev.id] = value));
@@ -128,25 +134,34 @@ export default function UserSearchHistory({ uid }) {
     <div className="space-y-4">
       
       {/* HEADER CONTROLS */}
-      <div className="flex items-center justify-between px-1">
-        <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-          {events.length} {events.length === 1 ? 'Eintrag' : 'Einträge'}
-        </span>
-        <div className="flex gap-4">
-          <button
-            type="button"
-            onClick={() => setAll(true)}
-            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
-          >
-            Alle öffnen
-          </button>
-          <button
-            type="button"
-            onClick={() => setAll(false)}
-            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            Alle schließen
-          </button>
+      <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+            {events.length} {events.length === 1 ? 'Eintrag' : 'Einträge'}
+          </span>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setAll(true)}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+            >
+              Alle öffnen
+            </button>
+            <button
+              type="button"
+              onClick={() => setAll(false)}
+              className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Alle schließen
+            </button>
+          </div>
+        </div>
+
+        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+          <span className="text-emerald-900">Summe</span>
+          <span>
+            {totalVisibleResults} {totalVisibleResults === 1 ? "Ergebnis" : "Ergebnisse"}
+          </span>
         </div>
       </div>
 
