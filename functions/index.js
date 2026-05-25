@@ -50,6 +50,218 @@ const getStripe = () => {
   return require("stripe")(STRIPE_SECRET.value());
 };
 
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function hashValue(value) {
+  const crypto = require("crypto");
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin || "*";
+  res.set("Access-Control-Allow-Origin", origin);
+  res.set("Vary", "Origin");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function getConfirmSubscriptionCancelBaseUrl(req) {
+  const protocol = req.protocol || "https";
+  const host = req.get("host");
+  if (!host) return "";
+
+  if (host.startsWith("requestsubscriptioncancel-")) {
+    return `${protocol}://${host.replace(
+      "requestsubscriptioncancel-",
+      "confirmsubscriptioncancel-"
+    )}`;
+  }
+
+  return `${protocol}://${host}/confirmSubscriptionCancel`;
+}
+
+function htmlPage(title, body) {
+  return `<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <style>
+    body{margin:0;background:#f5f8fa;color:#172033;font-family:Arial,sans-serif;}
+    main{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+    section{width:100%;max-width:560px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:28px;box-shadow:0 12px 30px rgba(15,23,42,.08);}
+    h1{margin:0 0 14px;font-size:26px;line-height:1.2;color:#0a3d62;}
+    p{margin:0 0 16px;font-size:16px;line-height:1.55;color:#4b5563;}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px;}
+    button,a.button{border:0;border-radius:6px;background:#0a3d62;color:#fff;font-size:16px;font-weight:700;padding:12px 18px;text-decoration:none;cursor:pointer;}
+    a.secondary{color:#0a3d62;text-decoration:underline;}
+    .muted{font-size:13px;color:#6b7280;}
+  </style>
+</head>
+<body>
+  <main>
+    <section>${body}</section>
+  </main>
+</body>
+</html>`;
+}
+
+async function checkCancelRequestRateLimit(email, ip) {
+  const now = Date.now();
+  const windowMs = 1000 * 60 * 60;
+  const emailKey = hashValue(email);
+  const ipKey = hashValue(ip);
+  const emailRef = db.collection("subscriptionCancelRateLimits").doc(`email_${emailKey}`);
+  const ipRef = db.collection("subscriptionCancelRateLimits").doc(`ip_${ipKey}`);
+
+  await db.runTransaction(async (tx) => {
+    const [emailSnap, ipSnap] = await Promise.all([tx.get(emailRef), tx.get(ipRef)]);
+    const emailData = emailSnap.data() || {};
+    const ipData = ipSnap.data() || {};
+    const emailCount = emailData.windowStart && now - emailData.windowStart < windowMs
+      ? Number(emailData.count || 0)
+      : 0;
+    const ipCount = ipData.windowStart && now - ipData.windowStart < windowMs
+      ? Number(ipData.count || 0)
+      : 0;
+
+    if (emailCount >= 3 || ipCount >= 20) {
+      throw new Error("RATE_LIMITED");
+    }
+
+    tx.set(emailRef, {
+      windowStart: emailCount ? emailData.windowStart : now,
+      count: emailCount + 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    tx.set(ipRef, {
+      windowStart: ipCount ? ipData.windowStart : now,
+      count: ipCount + 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+}
+
+async function sendSubscriptionCancelConfirmEmail(userRecord, token, confirmBaseUrl) {
+  const confirmUrl = `${confirmBaseUrl}?token=${encodeURIComponent(token)}`;
+  const transporter = getMailer();
+
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: userRecord.email,
+    subject: "Immobot-Abo kündigen bestätigen",
+    html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Abo-Kündigung bestätigen</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F8FA;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F5F8FA;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+               style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td align="center" style="background-color:#0A3D62;color:#ffffff;padding:20px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;">Abo-Kündigung bestätigen</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 20px 0 20px;color:#555555;font-size:16px;">Hallo,</td>
+          </tr>
+          <tr>
+            <td style="padding:18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              wir haben eine Anfrage erhalten, dein Immobot-Abo zu kündigen. Bitte bestätige die Kündigung nur, wenn du sie selbst ausgelöst hast.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 24px 20px;">
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0;">
+                <tr>
+                  <td style="border-radius:6px;" bgcolor="#0A3D62">
+                    <a href="${confirmUrl}" target="_blank"
+                       style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;border-radius:6px;">
+                      Kündigung prüfen
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 20px 24px 20px;color:#6b7280;font-size:13px;line-height:1.5;">
+              <hr style="border:0;border-top:1px solid #E5E7EB;margin:10px 0 16px 0;" />
+              <div style="margin:0 0 12px 0;">Falls du diese Anfrage nicht gestellt hast, ignoriere diese E-Mail.</div>
+              <div>Der Link ist 30 Minuten gültig und kann nur einmal verwendet werden.</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
+async function sendSubscriptionCancelledEmail(userRecord) {
+  const transporter = getMailer();
+
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: userRecord.email,
+    subject: "Dein Immobot-Abo wurde gekündigt",
+    html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Abo gekündigt</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F8FA;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F5F8FA;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+               style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td align="center" style="background-color:#0A3D62;color:#ffffff;padding:20px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;">Schade, dass du gehst</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 20px 0 20px;color:#555555;font-size:16px;">Hallo,</td>
+          </tr>
+          <tr>
+            <td style="padding:18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              dein Immobot-Abo wurde erfolgreich gekündigt. Es läuft bis zum Ende des bereits bezahlten Zeitraums weiter und wird danach nicht mehr verlängert.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 24px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Danke, dass du Immobot genutzt hast. Wir würden uns freuen, dich irgendwann wiederzusehen.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
 // ============================================================================
 // CREATE CHECKOUT SESSION
 // ============================================================================
@@ -116,6 +328,34 @@ exports.createCheckoutSession = onCall(
     );
 
     return { url: session.url };
+  }
+);
+
+// ============================================================================
+// RESET CHECKOUT STATUS
+// ============================================================================
+exports.resetCheckoutStatus = onCall(
+  { region: "europe-west1" },
+  async ({ auth }) => {
+    if (!auth) throw new Error("Login erforderlich.");
+
+    const userRef = db.collection("users").doc(auth.uid);
+    const snap = await userRef.get();
+    const status = snap.data()?.stripeStatus;
+
+    if (status !== "checkout_started" && status !== "pending") {
+      return { ok: true, skipped: true };
+    }
+
+    await userRef.set(
+      {
+        stripeStatus: admin.firestore.FieldValue.delete(),
+        stripeCheckoutSessionId: admin.firestore.FieldValue.delete(),
+      },
+      { merge: true }
+    );
+
+    return { ok: true };
   }
 );
 
@@ -205,6 +445,195 @@ exports.reactivateSubscription = onCall(
     );
 
     return { ok: true };
+  }
+);
+
+// ============================================================================
+// REQUEST SUBSCRIPTION CANCELLATION FROM PUBLIC WEBSITE
+// ============================================================================
+exports.requestSubscriptionCancel = onRequest(
+  {
+    region: "europe-west1",
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+  },
+  async (req, res) => {
+    setCorsHeaders(req, res);
+    if (req.method === "OPTIONS") return res.status(204).send("");
+    if (req.method !== "POST") return res.status(405).json({ ok: false });
+
+    const email = normalizeEmail(req.body?.email);
+    const genericResponse = {
+      ok: true,
+      message: "Falls ein passendes Konto existiert, senden wir eine E-Mail.",
+    };
+
+    if (!email || !email.includes("@")) {
+      return res.status(200).json(genericResponse);
+    }
+
+    try {
+      await checkCancelRequestRateLimit(email, getClientIp(req));
+    } catch (err) {
+      if (err.message === "RATE_LIMITED") {
+        return res.status(429).json({
+          ok: false,
+          message: "Bitte versuche es später erneut.",
+        });
+      }
+      console.error("Cancel request rate limit error", err);
+      return res.status(500).json({ ok: false });
+    }
+
+    try {
+      const userRecord = await admin.auth().getUserByEmail(email).catch(() => null);
+      if (!userRecord) return res.status(200).json(genericResponse);
+
+      const userRef = db.collection("users").doc(userRecord.uid);
+      const userSnap = await userRef.get();
+      const userData = userSnap.data() || {};
+
+      if (!userData.stripeSubscriptionId || userData.stripeCancelAtPeriodEnd === true) {
+        return res.status(200).json(genericResponse);
+      }
+
+      const crypto = require("crypto");
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = hashValue(rawToken);
+
+      await userRef.set(
+        {
+          cancelSubscriptionToken: tokenHash,
+          cancelSubscriptionTokenExpiresAt: Date.now() + 1000 * 60 * 30,
+          cancelSubscriptionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const confirmBaseUrl = getConfirmSubscriptionCancelBaseUrl(req);
+
+      await sendSubscriptionCancelConfirmEmail(userRecord, rawToken, confirmBaseUrl);
+      return res.status(200).json(genericResponse);
+    } catch (err) {
+      console.error("Cancel request error", err);
+      return res.status(200).json(genericResponse);
+    }
+  }
+);
+
+// ============================================================================
+// CONFIRM SUBSCRIPTION CANCELLATION VIA ONE-TIME LINK
+// ============================================================================
+exports.confirmSubscriptionCancel = onRequest(
+  {
+    region: "europe-west1",
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+  },
+  async (req, res) => {
+    const token = String(req.query.token || "");
+    if (!token) {
+      return res.status(400).send(htmlPage(
+        "Link ungültig",
+        `<h1>Link ungültig</h1><p>Der Kündigungslink fehlt oder ist unvollständig.</p>`
+      ));
+    }
+
+    const tokenHash = hashValue(token);
+    const snap = await db
+      .collection("users")
+      .where("cancelSubscriptionToken", "==", tokenHash)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.status(400).send(htmlPage(
+        "Link ungültig",
+        `<h1>Link ungültig</h1><p>Dieser Kündigungslink ist ungültig oder wurde bereits verwendet.</p>`
+      ));
+    }
+
+    const userRef = snap.docs[0].ref;
+    const uid = snap.docs[0].id;
+    const userData = snap.docs[0].data() || {};
+
+    if (!userData.cancelSubscriptionTokenExpiresAt || userData.cancelSubscriptionTokenExpiresAt < Date.now()) {
+      return res.status(400).send(htmlPage(
+        "Link abgelaufen",
+        `<h1>Link abgelaufen</h1><p>Dieser Kündigungslink ist abgelaufen. Bitte fordere über die Website einen neuen Link an.</p>`
+      ));
+    }
+
+    if (userData.cancelSubscriptionTokenUsedAt || userData.stripeCancelAtPeriodEnd === true) {
+      return res.status(200).send(htmlPage(
+        "Abo bereits gekündigt",
+        `<h1>Abo bereits gekündigt</h1><p>Dein Immobot-Abo ist bereits zur Kündigung vorgemerkt.</p><p class="muted">Du erhältst keine weiteren Abbuchungen nach dem aktuellen Abrechnungszeitraum.</p>`
+      ));
+    }
+
+    if (req.method === "GET") {
+      const action = `?token=${encodeURIComponent(token)}`;
+      return res.status(200).send(htmlPage(
+        "Abo kündigen",
+        `<h1>Abo wirklich kündigen?</h1>
+        <p>Wenn du bestätigst, wird dein Immobot-Abo zum Ende des bereits bezahlten Zeitraums gekündigt.</p>
+        <p>Bis dahin kannst du Immobot weiter nutzen.</p>
+        <form method="POST" action="${action}" class="actions">
+          <button type="submit">Abo jetzt kündigen</button>
+          <a class="secondary" href="${FRONTEND_BASE_URL.value()}/login">Abbrechen</a>
+        </form>
+        <p class="muted">Dieser Link ist nur einmal verwendbar.</p>`
+      ));
+    }
+
+    if (req.method !== "POST") {
+      return res.status(405).send("Method not allowed");
+    }
+
+    try {
+      const subId = userData.stripeSubscriptionId;
+      if (!subId) {
+        return res.status(400).send(htmlPage(
+          "Kein Abo gefunden",
+          `<h1>Kein aktives Abo gefunden</h1><p>Für dieses Konto wurde keine Stripe-Subscription gefunden.</p>`
+        ));
+      }
+
+      const stripe = getStripe();
+      const updated = await stripe.subscriptions.update(subId, {
+        cancel_at_period_end: true,
+      });
+
+      await userRef.set(
+        {
+          stripeCancelAtPeriodEnd: true,
+          stripeSubscriptionStatus: updated.status,
+          cancelSubscriptionTokenUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelSubscriptionConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelSubscriptionToken: admin.firestore.FieldValue.delete(),
+          cancelSubscriptionTokenExpiresAt: admin.firestore.FieldValue.delete(),
+        },
+        { merge: true }
+      );
+
+      const userRecord = await admin.auth().getUser(uid).catch(() => null);
+      if (userRecord?.email) {
+        try {
+          await sendSubscriptionCancelledEmail(userRecord);
+        } catch (mailErr) {
+          console.error("Cancelled confirmation mail could not be sent", mailErr);
+        }
+      }
+
+      return res.status(200).send(htmlPage(
+        "Abo gekündigt",
+        `<h1>Abo erfolgreich gekündigt</h1><p>Dein Immobot-Abo wurde zum Ende des aktuellen Abrechnungszeitraums gekündigt.</p><p>Wir haben dir dazu gerade eine Bestätigung per E-Mail gesendet.</p>`
+      ));
+    } catch (err) {
+      console.error("Cancel confirmation error", err);
+      return res.status(500).send(htmlPage(
+        "Kündigung fehlgeschlagen",
+        `<h1>Kündigung fehlgeschlagen</h1><p>Die Kündigung konnte gerade nicht abgeschlossen werden. Bitte versuche es später erneut oder kontaktiere den Support.</p>`
+      ));
+    }
   }
 );
 
