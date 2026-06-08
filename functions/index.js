@@ -1,7 +1,9 @@
 // ============================================================================
 // IMPORTS (Firebase Functions v2)
 // ============================================================================
-const { onCall, onRequest } = require("firebase-functions/v2/https");
+const { HttpsError, onCall, onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineString } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
@@ -42,6 +44,10 @@ const STRIPE_WEBHOOK_SECRET = defineString("STRIPE_WEBHOOK_SECRET");
 const PRICE_MONTHLY = defineString("PRICE_MONTHLY");
 const PRICE_YEARLY = defineString("PRICE_YEARLY");
 const FRONTEND_BASE_URL = defineString("FRONTEND_BASE_URL");
+
+const OFFER_REDIRECT_RETENTION_DAYS = 31;
+const OFFER_REDIRECT_DELETE_BATCH_SIZE = 450;
+const OFFER_REDIRECT_MAX_DELETES_PER_RUN = 10000;
 
 // ============================================================================
 // STRIPE INITIALIZER
@@ -115,6 +121,130 @@ function htmlPage(title, body) {
   </main>
 </body>
 </html>`;
+}
+
+function offerRedirectCleanupCutoff(days = OFFER_REDIRECT_RETENTION_DAYS) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return cutoff;
+}
+
+async function requireCallableAdmin(request) {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Login required.");
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  if (userSnap.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin role required.");
+  }
+}
+
+async function cleanupOldOfferRedirects({
+  dryRun = false,
+  days = OFFER_REDIRECT_RETENTION_DAYS,
+  maxDeletes = OFFER_REDIRECT_MAX_DELETES_PER_RUN,
+  source = "unknown",
+  requestedBy = null,
+} = {}) {
+  const runRef = db.collection("offerRedirectCleanupRuns").doc();
+  const cutoff = offerRedirectCleanupCutoff(days);
+  const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoff);
+  let scanned = 0;
+  let deleted = 0;
+  const examples = [];
+
+  await runRef.set({
+    source,
+    requestedBy,
+    dryRun,
+    days,
+    cutoff: cutoffTimestamp,
+    maxDeletes,
+    scanned: 0,
+    deleted: 0,
+    status: "running",
+    startedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  try {
+    while (scanned < maxDeletes) {
+      const remaining = maxDeletes - scanned;
+      const limit = Math.min(OFFER_REDIRECT_DELETE_BATCH_SIZE, remaining);
+      const snap = await db
+        .collection("offerRedirects")
+        .where("createdAt", "<", cutoffTimestamp)
+        .orderBy("createdAt", "asc")
+        .limit(limit)
+        .get();
+
+      if (snap.empty) break;
+
+      scanned += snap.size;
+
+      snap.docs.slice(0, Math.max(0, 10 - examples.length)).forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        examples.push({
+          id: docSnap.id,
+          uid: data.uid || null,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : null,
+          title: data.title || null,
+        });
+      });
+
+      if (dryRun) break;
+
+      const batch = db.batch();
+      snap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+      await batch.commit();
+      deleted += snap.size;
+
+      await runRef.set(
+        {
+          scanned,
+          deleted,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    const result = {
+      id: runRef.id,
+      dryRun,
+      days,
+      cutoff: cutoff.toISOString(),
+      scanned,
+      deleted,
+      reachedMaxDeletes: scanned >= maxDeletes,
+      examples,
+    };
+
+    await runRef.set(
+      {
+        ...result,
+        cutoff: cutoffTimestamp,
+        status: "completed",
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return result;
+  } catch (err) {
+    await runRef.set(
+      {
+        scanned,
+        deleted,
+        status: "error",
+        errorMessage: err?.message || "Unknown error",
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    throw err;
+  }
 }
 
 async function checkCancelRequestRateLimit(email, ip) {
@@ -1188,5 +1318,111 @@ exports.trackOfferClick = onRequest(
         details: err.message,
       });
     }
+  }
+);
+
+// ============================================================================
+// CLEANUP OLD OFFER REDIRECTS
+// ============================================================================
+exports.cleanupOldOfferRedirectsPreview = onCall(
+  { region: "europe-west1" },
+  async (request) => {
+    await requireCallableAdmin(request);
+
+    const days = Number(request.data?.days || OFFER_REDIRECT_RETENTION_DAYS);
+    const result = await cleanupOldOfferRedirects({
+      dryRun: true,
+      days: Number.isFinite(days) && days >= OFFER_REDIRECT_RETENTION_DAYS
+        ? days
+        : OFFER_REDIRECT_RETENTION_DAYS,
+      maxDeletes: Number(request.data?.maxDeletes || OFFER_REDIRECT_DELETE_BATCH_SIZE),
+      source: "admin-preview",
+      requestedBy: request.auth.uid,
+    });
+
+    console.log("offerRedirects cleanup preview:", result);
+    return result;
+  }
+);
+
+exports.cleanupOldOfferRedirectsRequested = onDocumentCreated(
+  {
+    region: "europe-west1",
+    document: "offerRedirectCleanupRequests/{requestId}",
+    memory: "256MiB",
+    timeoutSeconds: 540,
+  },
+  async (event) => {
+    const requestRef = event.data?.ref;
+    const requestData = event.data?.data() || {};
+    const requestedBy = requestData.requestedBy || null;
+
+    try {
+      await requestRef.set(
+        {
+          status: "running",
+          startedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const days = Number(requestData.days || OFFER_REDIRECT_RETENTION_DAYS);
+      const maxDeletes = Number(requestData.maxDeletes || OFFER_REDIRECT_MAX_DELETES_PER_RUN);
+      const result = await cleanupOldOfferRedirects({
+        dryRun: false,
+        days: Number.isFinite(days) && days >= OFFER_REDIRECT_RETENTION_DAYS
+          ? days
+          : OFFER_REDIRECT_RETENTION_DAYS,
+        maxDeletes: Number.isFinite(maxDeletes) && maxDeletes > 0
+          ? Math.min(maxDeletes, OFFER_REDIRECT_MAX_DELETES_PER_RUN)
+          : OFFER_REDIRECT_MAX_DELETES_PER_RUN,
+        source: "admin-firestore-request",
+        requestedBy,
+      });
+
+      await requestRef.set(
+        {
+          status: "completed",
+          cleanupRunId: result.id,
+          scanned: result.scanned,
+          deleted: result.deleted,
+          cutoff: admin.firestore.Timestamp.fromDate(new Date(result.cutoff)),
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      console.log("offerRedirects requested cleanup:", result);
+    } catch (err) {
+      await requestRef.set(
+        {
+          status: "error",
+          errorMessage: err?.message || "Unknown error",
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      throw err;
+    }
+  }
+);
+
+exports.cleanupOldOfferRedirectsDaily = onSchedule(
+  {
+    region: "europe-west1",
+    schedule: "30 3 * * *",
+    timeZone: "Europe/Madrid",
+    memory: "256MiB",
+    timeoutSeconds: 540,
+  },
+  async () => {
+    const result = await cleanupOldOfferRedirects({
+      dryRun: false,
+      days: OFFER_REDIRECT_RETENTION_DAYS,
+      maxDeletes: OFFER_REDIRECT_MAX_DELETES_PER_RUN,
+      source: "scheduled",
+    });
+
+    console.log("offerRedirects daily cleanup:", result);
   }
 );

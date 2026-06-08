@@ -17,7 +17,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* NAVIGATION GRID (Bento Style) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           
           <NavCard
             title="User Management"
@@ -44,6 +44,15 @@ export default function AdminDashboard() {
             icon={<LinkIcon />}
             color="text-emerald-600"
             bg="bg-emerald-50"
+          />
+
+          <NavCard
+            title="Cleanup"
+            desc="Alte Suchergebnisse bereinigen und Läufe prüfen."
+            to="/admin/cleanup"
+            icon={<CleanupIcon />}
+            color="text-red-600"
+            bg="bg-red-50"
           />
           
         </div>
@@ -108,6 +117,14 @@ function LinkIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+    </svg>
+  );
+}
+
+function CleanupIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m3-3h4a1 1 0 011 1v2H9V5a1 1 0 011-1z" />
     </svg>
   );
 }

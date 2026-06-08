@@ -138,5 +138,18 @@ service cloud.firestore {
 
       allow write: if isAdmin();
     }
+
+    // =========================
+    //  Cleanup Logs
+    // =========================
+    match /offerRedirectCleanupRuns/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /offerRedirectCleanupRequests/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
   }
 }

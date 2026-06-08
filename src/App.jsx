@@ -8,6 +8,7 @@ import Login from "./pages/public/Login";
 import AdminClicks from "./pages/admin/clicks/AdminClicks";
 import AdminOffers from "./pages/admin/offers/AdminOffers";
 import AdminOfferDetails from "./pages/admin/offers/AdminOfferDetails";
+import AdminCleanup from "./pages/admin/cleanup/AdminCleanup";
 
 // Register-Flow (öffentlich)
 import Step1 from "./pages/public/register/Step1";
@@ -100,6 +101,7 @@ export default function App() {
 <Route path="/admin/clicks" element={<AdminClicks />} />
 <Route path="/admin/offers" element={<AdminOffers />} />
 <Route path="/admin/offers/:offerId" element={<AdminOfferDetails />} />
+<Route path="/admin/cleanup" element={<AdminCleanup />} />
 
 
       </Route>
