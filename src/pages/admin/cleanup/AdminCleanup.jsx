@@ -36,7 +36,6 @@ export default function AdminCleanup() {
   const [runs, setRuns] = useState([]);
   const [requests, setRequests] = useState([]);
   const [preview, setPreview] = useState(null);
-  const [cleanup, setCleanup] = useState(null);
   const [testEmail, setTestEmail] = useState(user?.email || "");
   const [testMessage, setTestMessage] = useState("");
   const [loadingRuns, setLoadingRuns] = useState(true);
@@ -111,27 +110,6 @@ export default function AdminCleanup() {
       await loadRuns();
     } catch (err) {
       setError(err?.message || "Cleanup-Anforderung fehlgeschlagen.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const runCleanup = async (dryRun) => {
-    if (!dryRun) {
-      const ok = window.confirm(
-        "Verwaiste Auth-Konten JETZT scharf löschen? Es werden Firebase-Auth-Konten gelöscht, die kein users-Dokument haben. Diese Aktion kann nicht rückgängig gemacht werden."
-      );
-      if (!ok) return;
-    }
-
-    setBusy(dryRun ? "cleanup-dry" : "cleanup-real");
-    setError("");
-    try {
-      const fn = httpsCallable(functions, "runOrphanedAuthCleanup");
-      const result = await fn({ dryRun });
-      setCleanup({ dryRun, ...result.data });
-    } catch (err) {
-      setError(err?.message || "Cleanup fehlgeschlagen.");
     } finally {
       setBusy(null);
     }
@@ -228,73 +206,6 @@ export default function AdminCleanup() {
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-5">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">
-              Verwaiste Auth-Konten (manuell testen)
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Löscht Firebase-Auth-Konten ohne <code className="text-xs">users</code>-Dokument.
-              Läuft automatisch täglich 04:00 Uhr. Hier zum Testen: <strong>Dry-Run</strong> zeigt nur,
-              was gelöscht würde – ohne etwas zu löschen.
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => runCleanup(true)}
-              disabled={!!busy}
-              className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              {busy === "cleanup-dry" ? "Teste..." : "Test (Dry-Run)"}
-            </button>
-            <button
-              onClick={() => runCleanup(false)}
-              disabled={!!busy}
-              className="px-4 py-2 rounded-lg bg-red-600 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
-            >
-              {busy === "cleanup-real" ? "Lösche..." : "Jetzt scharf löschen"}
-            </button>
-          </div>
-        </div>
-
-        {cleanup && (
-          <div
-            className={`rounded-lg border p-4 text-sm ${
-              cleanup.aborted
-                ? "border-red-200 bg-red-50"
-                : "border-gray-200 bg-gray-50"
-            }`}
-          >
-            {cleanup.aborted ? (
-              <p className="font-bold text-red-700">
-                Abgebrochen (Sicherheits-Stopp): {cleanup.reason}
-              </p>
-            ) : (
-              <>
-                <div className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
-                  {cleanup.dryRun ? "Dry-Run – nichts gelöscht" : "Scharfer Lauf"}
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <PreviewItem label="Auth-Konten" value={cleanup.scannedAuthUsers} />
-                  <PreviewItem label="users-Dokumente" value={cleanup.firestoreUsers} />
-                  <PreviewItem label="Verwaist" value={cleanup.orphanCount} />
-                  <PreviewItem
-                    label={cleanup.dryRun ? "Würde löschen" : "Gelöscht"}
-                    value={cleanup.dryRun ? Math.min(cleanup.orphanCount, 300) : cleanup.deleted}
-                  />
-                </div>
-                {cleanup.capped && (
-                  <p className="mt-3 text-xs font-medium text-amber-700">
-                    Obergrenze 300/Lauf erreicht – der Rest folgt im nächsten Lauf.
-                  </p>
-                )}
-              </>
             )}
           </div>
         )}
