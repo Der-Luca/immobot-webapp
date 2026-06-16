@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { db } from "@/firebase.js";
+import { db, functions } from "@/firebase.js";
+import { httpsCallable } from "firebase/functions";
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -107,7 +107,7 @@ export default function AdminUserDetails() {
     if (!user?.uid || dangerAction) return;
 
     const confirmed = window.confirm(
-      `Willst du wirklich den User ${email} löschen? Das löscht das Firestore-Userprofil, aber nicht automatisch das Firebase-Auth-Konto.`
+      `Willst du wirklich den User ${email} löschen? Das löscht das Firestore-Userprofil UND das Firebase-Auth-Konto. Diese Aktion kann nicht rückgängig gemacht werden.`
     );
 
     if (!confirmed) {
@@ -119,7 +119,8 @@ export default function AdminUserDetails() {
     setDangerMessage(null);
 
     try {
-      await deleteDoc(doc(db, "users", user.uid));
+      const deleteAccount = httpsCallable(functions, "adminDeleteUserAccount");
+      await deleteAccount({ uid: user.uid });
       navigate("/admin/users", { replace: true });
     } catch (err) {
       console.error("Error deleting user:", err);
@@ -194,11 +195,44 @@ export default function AdminUserDetails() {
                     <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide border ${statusColors}`}>
                       {status}
                     </span>
+                    {user.cancelSubscriptionTerminationType === "extraordinary" && (
+                      <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-200">
+                        Kündigung prüfen
+                      </span>
+                    )}
                     <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100">
                       {role}
                     </span>
                   </div>
                 </div>
+
+                {user.cancelSubscriptionTerminationType === "extraordinary" && (
+                  <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <div className="font-bold">Außerordentliche Kündigung zur Prüfung</div>
+                    <p className="mt-1">
+                      Der Kunde hat eine außerordentliche Kündigung mit sofortiger Wirkung eingereicht.
+                    </p>
+                    {user.cancelSubscriptionExtraordinaryReason && (
+                      <p className="mt-2 whitespace-pre-wrap text-amber-950">
+                        {user.cancelSubscriptionExtraordinaryReason}
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={`mailto:${email}?subject=${encodeURIComponent("Außerordentliche Kündigung Immobot")}`}
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                      >
+                        Kunde kontaktieren
+                      </a>
+                      <Link
+                        to="/admin/cancellations"
+                        className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                      >
+                        Kündigungsfälle öffnen
+                      </Link>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-6 space-y-4">
                   {/* Email */}

@@ -17,7 +17,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* NAVIGATION GRID (Bento Style) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           
           <NavCard
             title="User Management"
@@ -53,6 +53,15 @@ export default function AdminDashboard() {
             icon={<CleanupIcon />}
             color="text-red-600"
             bg="bg-red-50"
+          />
+
+          <NavCard
+            title="Kündigungen"
+            desc="Außerordentliche Kündigungen prüfen und Kunden kontaktieren."
+            to="/admin/cancellations"
+            icon={<CancellationIcon />}
+            color="text-amber-700"
+            bg="bg-amber-50"
           />
           
         </div>
@@ -125,6 +134,15 @@ function CleanupIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m3-3h4a1 1 0 011 1v2H9V5a1 1 0 011-1z" />
+    </svg>
+  );
+}
+
+function CancellationIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8h.01" />
     </svg>
   );
 }

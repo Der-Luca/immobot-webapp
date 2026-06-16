@@ -70,21 +70,17 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-950 px-4 py-10">
-      <div className="pointer-events-none fixed inset-0">
-        <img
-          src="/login-background.jpg"
-          alt=""
-          className="h-full w-full object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-slate-950/55" />
-        <div className="absolute inset-0 bg-linear-to-r from-slate-950/40 via-transparent to-slate-950/30" />
-      </div>
+    <div
+      className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-950 bg-cover bg-center px-4 py-10"
+      style={{ backgroundImage: 'url("/login-background.jpg")' }}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/55" />
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-r from-slate-950/45 via-slate-950/15 to-slate-950/45" />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Branding / Header */}
         <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600 border border-white/70 shadow-sm">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600 border border-slate-200 shadow-sm">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-500 text-[9px] font-bold text-white">
               I
             </span>

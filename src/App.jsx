@@ -9,6 +9,7 @@ import AdminClicks from "./pages/admin/clicks/AdminClicks";
 import AdminOffers from "./pages/admin/offers/AdminOffers";
 import AdminOfferDetails from "./pages/admin/offers/AdminOfferDetails";
 import AdminCleanup from "./pages/admin/cleanup/AdminCleanup";
+import AdminCancellations from "./pages/admin/cancellations/AdminCancellations";
 
 // Register-Flow (öffentlich)
 import Step1 from "./pages/public/register/Step1";
@@ -99,9 +100,10 @@ export default function App() {
 <Route path="/admin/users" element={<AdminUserList />} />
 <Route path="/admin/user/:uid" element={<AdminUserDetails />} />
 <Route path="/admin/clicks" element={<AdminClicks />} />
-<Route path="/admin/offers" element={<AdminOffers />} />
-<Route path="/admin/offers/:offerId" element={<AdminOfferDetails />} />
-<Route path="/admin/cleanup" element={<AdminCleanup />} />
+	<Route path="/admin/offers" element={<AdminOffers />} />
+	<Route path="/admin/offers/:offerId" element={<AdminOfferDetails />} />
+	<Route path="/admin/cleanup" element={<AdminCleanup />} />
+	<Route path="/admin/cancellations" element={<AdminCancellations />} />
 
 
       </Route>

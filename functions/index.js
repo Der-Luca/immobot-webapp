@@ -346,8 +346,18 @@ async function sendSubscriptionCancelConfirmEmail(userRecord, token, confirmBase
   });
 }
 
-async function sendSubscriptionCancelledEmail(userRecord) {
+function formatUnixDate(seconds) {
+  if (!seconds) return "";
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(seconds * 1000));
+}
+
+async function sendSubscriptionCancelledEmail(userRecord, details = {}) {
   const transporter = getMailer();
+  const periodEnd = formatUnixDate(details.periodEnd);
 
   await transporter.sendMail({
     from: `"Immobot" <${SMTP_USER.value()}>`,
@@ -373,14 +383,19 @@ async function sendSubscriptionCancelledEmail(userRecord) {
           <tr>
             <td style="padding:24px 20px 0 20px;color:#555555;font-size:16px;">Hallo,</td>
           </tr>
-          <tr>
-            <td style="padding:18px 20px;color:#555555;font-size:16px;line-height:1.5;">
-              dein Immobot-Abo wurde erfolgreich gekündigt. Es läuft bis zum Ende des bereits bezahlten Zeitraums weiter und wird danach nicht mehr verlängert.
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 20px 24px 20px;color:#555555;font-size:16px;line-height:1.5;">
-              Danke, dass du Immobot genutzt hast. Wir würden uns freuen, dich irgendwann wiederzusehen.
+	          <tr>
+	            <td style="padding:18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+	              dein Immobot-Abo wurde erfolgreich gekündigt. Es läuft bis zum Ende des bereits bezahlten Zeitraums${periodEnd ? ` am ${periodEnd}` : ""} weiter und wird danach nicht mehr verlängert.
+	            </td>
+	          </tr>
+	          <tr>
+	            <td style="padding:0 20px 18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+	              Datum der Kündigungserklärung: ${new Date().toLocaleDateString("de-DE")}
+	            </td>
+	          </tr>
+	          <tr>
+	            <td style="padding:0 20px 24px 20px;color:#555555;font-size:16px;line-height:1.5;">
+	              Danke, dass du Immobot genutzt hast. Wir würden uns freuen, dich irgendwann wiederzusehen.
             </td>
           </tr>
         </table>
@@ -390,6 +405,375 @@ async function sendSubscriptionCancelledEmail(userRecord) {
 </body>
 </html>`,
   });
+}
+
+async function sendExtraordinaryCancellationReceivedEmail(userRecord, details = {}) {
+  const transporter = getMailer();
+  const receivedDate = new Date().toLocaleString("de-DE");
+
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: userRecord.email,
+    subject: "Deine außerordentliche Kündigung ist eingegangen",
+    html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Außerordentliche Kündigung eingegangen</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F8FA;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F5F8FA;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+               style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td align="center" style="background-color:#0A3D62;color:#ffffff;padding:20px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;">Kündigung eingegangen</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 20px 0 20px;color:#555555;font-size:16px;">Hallo,</td>
+          </tr>
+          <tr>
+            <td style="padding:18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              deine außerordentliche Kündigung des Immobot-Abos ist elektronisch bei uns eingegangen.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Eingang der Kündigungserklärung: ${receivedDate}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Kündigungswunsch: außerordentliche Kündigung mit sofortiger Wirkung
+            </td>
+          </tr>
+          ${details.reason ? `<tr>
+            <td style="padding:0 20px 18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Angegebener Grund: ${escapeHtml(details.reason)}
+            </td>
+          </tr>` : ""}
+          <tr>
+            <td style="padding:0 20px 24px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Wir prüfen den angegebenen Grund und melden uns elektronisch bei dir.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
+async function sendExtraordinaryCancellationReviewEmail(userRecord, details = {}) {
+  const transporter = getMailer();
+
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: "cd@immobot.pro",
+    subject: "Prüfung erforderlich: außerordentliche Abo-Kündigung",
+    html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Außerordentliche Kündigung prüfen</title>
+</head>
+<body style="font-family:Arial,sans-serif;color:#172033;">
+  <h1>Außerordentliche Kündigung prüfen</h1>
+  <p><strong>E-Mail:</strong> ${escapeHtml(userRecord.email || "")}</p>
+  <p><strong>Firebase UID:</strong> ${escapeHtml(userRecord.uid || "")}</p>
+  <p><strong>Stripe Subscription:</strong> ${escapeHtml(details.subscriptionId || "")}</p>
+  <p><strong>Grund:</strong></p>
+  <p style="white-space:pre-wrap;">${escapeHtml(details.reason || "")}</p>
+  <p>Diese Kündigung wurde nicht automatisch in Stripe beendet. Bitte manuell prüfen.</p>
+</body>
+</html>`,
+  });
+}
+
+function formatCurrencyFromCents(amount, currency = "eur") {
+  const value = Number(amount || 0) / 100;
+  return new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: String(currency || "eur").toUpperCase(),
+  }).format(value);
+}
+
+function formatGermanDateFromSeconds(seconds) {
+  if (!seconds) return "nicht verfügbar";
+  return new Date(seconds * 1000).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatAddress(address) {
+  if (!address) return "nicht angegeben";
+
+  const line1 = [address.line1, address.line2].filter(Boolean).join(" ");
+  const line2 = [address.postal_code, address.city].filter(Boolean).join(" ");
+  const parts = [line1, line2, address.country].filter(Boolean);
+
+  return parts.length ? parts.join(", ") : "nicht angegeben";
+}
+
+function getInvoiceSubscriptionLine(invoice) {
+  const lines = invoice?.lines?.data || [];
+  return lines.find((line) => line.type === "subscription") || lines[0] || {};
+}
+
+async function resolvePaymentMethodLabel(stripe, invoice) {
+  try {
+    if (invoice.payment_intent) {
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        typeof invoice.payment_intent === "string"
+          ? invoice.payment_intent
+          : invoice.payment_intent.id,
+        { expand: ["payment_method"] }
+      );
+
+      const paymentMethod = paymentIntent.payment_method;
+      if (paymentMethod?.type) {
+        if (paymentMethod.type === "card") {
+          const brand = paymentMethod.card?.brand
+            ? paymentMethod.card.brand.toUpperCase()
+            : "Karte";
+          const last4 = paymentMethod.card?.last4
+            ? ` **** ${paymentMethod.card.last4}`
+            : "";
+          return `${brand}${last4}`;
+        }
+
+        if (paymentMethod.type === "sepa_debit") {
+          return "SEPA-Lastschrift";
+        }
+
+        return paymentMethod.type
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+      }
+    }
+
+    return invoice.collection_method === "charge_automatically"
+      ? "automatische Abbuchung"
+      : "Rechnung";
+  } catch (err) {
+    console.error("Payment method label could not be resolved", err);
+    return "automatische Abbuchung";
+  }
+}
+
+async function sendSubscriptionWelcomeEmail({
+  stripe,
+  uid,
+  invoice,
+  userSnap,
+  toEmailOverride = null,
+}) {
+  const invoiceId = invoice?.id;
+  if (!invoiceId) {
+    throw new Error("Invoice ID fehlt.");
+  }
+
+  const mailRef = db.collection("subscriptionWelcomeEmails").doc(invoiceId);
+  const shouldSend = await db.runTransaction(async (tx) => {
+    const existing = await tx.get(mailRef);
+    if (existing.exists && ["sending", "sent"].includes(existing.data()?.status)) {
+      return false;
+    }
+
+    tx.set(mailRef, {
+      uid,
+      invoiceId,
+      status: "sending",
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return true;
+  });
+
+  if (!shouldSend) {
+    return { ok: true, skipped: true };
+  }
+
+  try {
+    const userData = userSnap.data() || {};
+    const userRecord = await admin.auth().getUser(uid).catch(() => null);
+    const customer = invoice.customer
+      ? await stripe.customers.retrieve(
+          typeof invoice.customer === "string" ? invoice.customer : invoice.customer.id
+        ).catch(() => null)
+      : null;
+
+    const firstName = userData.firstName || "";
+    const lastName = userData.lastName || "";
+    const fullName = [firstName, lastName].filter(Boolean).join(" ")
+      || customer?.name
+      || userRecord?.displayName
+      || "Kunde";
+    const email = toEmailOverride || userRecord?.email || userData.email || customer?.email;
+    const line = getInvoiceSubscriptionLine(invoice);
+    const priceText = formatCurrencyFromCents(
+      line.price?.unit_amount || line.amount || invoice.amount_paid || 1499,
+      invoice.currency || "eur"
+    );
+    const orderDate = formatGermanDateFromSeconds(invoice.created);
+    const contractStart = formatGermanDateFromSeconds(
+      line.period?.start || invoice.period_start || invoice.created
+    );
+    const paymentMethod = await resolvePaymentMethodLabel(stripe, invoice);
+    const customerAddress = formatAddress(customer?.address);
+    const orderNumber = invoice.number || invoice.id;
+    const invoiceUrl = invoice.hosted_invoice_url || "";
+    const legalBaseUrl = "https://immobot.pro";
+    const transporter = getMailer();
+
+    if (!email) {
+      throw new Error("Empfänger-E-Mail fehlt.");
+    }
+
+    await transporter.sendMail({
+      from: `"Immobot" <${SMTP_USER.value()}>`,
+      to: email,
+      subject: "Ihre Bestellung / Ihr Abo bei immobot.pro - Bestätigung & Willkommen",
+      html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Bestätigung & Willkommen</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F8FA;font-family:Arial,sans-serif;color:#172033;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F5F8FA;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:640px;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #E5E7EB;">
+          <tr>
+            <td align="center" style="background-color:#0A3D62;color:#ffffff;padding:24px 20px;">
+              <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:bold;">Willkommen bei Immobot</h1>
+              <p style="margin:8px 0 0 0;font-size:14px;color:#DBEAFE;">Ihre Bestellung und Ihr Abo wurden bestätigt.</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0;margin:0;">
+              <img src="https://immobot.pro/mail-bilder/hero.png" alt="Immobot" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:0;margin:0;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 24px 8px 24px;color:#172033;font-size:16px;line-height:1.6;">
+              <p style="margin:0 0 14px 0;">Sehr geehrte Kundin, sehr geehrter Kunde,</p>
+              <p style="margin:0 0 14px 0;">vielen Dank für Ihre Bestellung bei immobot.pro und Ihr Vertrauen. Mit dieser E-Mail bestätigen wir Ihnen den Abschluss Ihres Abonnements.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 24px 0 24px;">
+              <h2 style="margin:0 0 12px 0;font-size:18px;color:#0A3D62;">1. Ihre Bestelldaten / Vertragsbestätigung</h2>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;font-size:14px;color:#374151;">
+                <tr><td style="padding:7px 0;font-weight:bold;width:190px;">Name</td><td style="padding:7px 0;">${escapeHtml(fullName)}</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Anschrift</td><td style="padding:7px 0;">${escapeHtml(customerAddress)}</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">E-Mail-Adresse</td><td style="padding:7px 0;">${escapeHtml(email)}</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Vertragspartner</td><td style="padding:7px 0;">Christoph Denlöffel, Krankenhausstr. 4a, 87634 Obergünzburg, Telefon: 0156/78315679, E-Mail: cd@immobot.pro, USt-IdNr.: DE402662980</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Bestelldatum</td><td style="padding:7px 0;">${escapeHtml(orderDate)}</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Bestellnummer</td><td style="padding:7px 0;">${escapeHtml(orderNumber)}</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Inhalt des Abos</td><td style="padding:7px 0;">Standard Plan - Tool zur Suche nach Immobilien via digitalem Zugang</td></tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:22px 24px 0 24px;">
+              <h2 style="margin:0 0 12px 0;font-size:18px;color:#0A3D62;">2. Preis, Zahlungsweise und Abrechnungszeitraum</h2>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;font-size:14px;color:#374151;">
+                <tr><td style="padding:7px 0;font-weight:bold;width:190px;">Preis des Abos</td><td style="padding:7px 0;">${escapeHtml(priceText)} / Monat inkl. MwSt.</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Abrechnungszeitraum</td><td style="padding:7px 0;">monatlich</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Zahlungsart</td><td style="padding:7px 0;">${escapeHtml(paymentMethod)}</td></tr>
+              </table>
+              <p style="margin:10px 0 0 0;font-size:14px;line-height:1.6;color:#4B5563;">Die Zahlungen werden bis zur Kündigung Ihres Abonnements automatisch zum jeweiligen Fälligkeitstermin abgebucht.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:22px 24px 0 24px;">
+              <h2 style="margin:0 0 12px 0;font-size:18px;color:#0A3D62;">3. Laufzeit, Verlängerung und Kündigung</h2>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;font-size:14px;color:#374151;">
+                <tr><td style="padding:7px 0;font-weight:bold;width:190px;">Vertragsbeginn</td><td style="padding:7px 0;">${escapeHtml(contractStart)}</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Mindestlaufzeit</td><td style="padding:7px 0;">1 Monat</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Verlängerung</td><td style="padding:7px 0;">Nach Ablauf der Mindestvertragslaufzeit verlängert sich das Abonnement jeweils um einen weiteren Monat.</td></tr>
+                <tr><td style="padding:7px 0;font-weight:bold;">Kündigung</td><td style="padding:7px 0;">Sie können Ihr Abo unter Beachtung der vereinbarten Kündigungsfrist über den Online-Kündigungsbutton auf unserer Website oder per E-Mail in Textform kündigen.</td></tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:22px 24px 0 24px;">
+              <h2 style="margin:0 0 12px 0;font-size:18px;color:#0A3D62;">4. Widerrufsverzicht</h2>
+              <p style="margin:0;font-size:14px;line-height:1.6;color:#4B5563;">Sie haben uns im Bestellprozess ausdrücklich darum gebeten, mit der Ausführung des Vertrages bereits vor Ablauf der Widerrufsfrist zu beginnen. Wir weisen darauf hin, dass Ihr Widerrufsrecht erlischt, wenn wir den Vertrag vollständig erfüllt haben, bevor Sie Ihr Widerrufsrecht ausüben. Details finden Sie in der Widerrufsbelehrung.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:22px 24px 0 24px;">
+              <h2 style="margin:0 0 12px 0;font-size:18px;color:#0A3D62;">5. AGB und Datenschutz</h2>
+              <p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#4B5563;">Es gelten unsere Allgemeinen Geschäftsbedingungen. Informationen zur Verarbeitung Ihrer personenbezogenen Daten finden Sie in unserer Datenschutzerklärung.</p>
+              <p style="margin:0;font-size:14px;line-height:1.8;color:#4B5563;">
+                <a href="${legalBaseUrl}/agb" style="color:#0A3D62;text-decoration:underline;">AGB</a> &nbsp;|&nbsp;
+                <a href="${legalBaseUrl}/widerruf" style="color:#0A3D62;text-decoration:underline;">Widerrufsbelehrung</a> &nbsp;|&nbsp;
+                <a href="${legalBaseUrl}/datenschutz" style="color:#0A3D62;text-decoration:underline;">Datenschutz</a>
+              </p>
+            </td>
+          </tr>
+          ${invoiceUrl ? `
+          <tr>
+            <td style="padding:22px 24px 0 24px;">
+              <table cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td bgcolor="#0A3D62" style="border-radius:6px;">
+                    <a href="${invoiceUrl}" target="_blank" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;border-radius:6px;">Stripe-Rechnung anzeigen</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>` : ""}
+          <tr>
+            <td style="padding:24px;color:#4B5563;font-size:14px;line-height:1.6;">
+              <p style="margin:0 0 14px 0;">Wir wünschen Ihnen viel Freude und Erfolg bei Ihrer Suche und bedanken uns für Ihr Vertrauen.</p>
+              <p style="margin:0;">Mit freundlichen Grüßen<br />Christoph Denlöffel</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+    });
+
+    await mailRef.set({
+      status: "sent",
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      to: email,
+      uid,
+      invoiceId,
+      orderNumber,
+    }, { merge: true });
+
+    return { ok: true };
+  } catch (err) {
+    await mailRef.set({
+      status: "error",
+      errorMessage: err?.message || "Unknown error",
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    throw err;
+  }
 }
 
 // ============================================================================
@@ -592,9 +976,15 @@ exports.requestSubscriptionCancel = onRequest(
     if (req.method !== "POST") return res.status(405).json({ ok: false });
 
     const email = normalizeEmail(req.body?.email);
+    const terminationType =
+      String(req.body?.terminationType || "ordinary") === "extraordinary"
+        ? "extraordinary"
+        : "ordinary";
+    const terminationDate = String(req.body?.terminationDate || "next").trim().slice(0, 40);
+    const extraordinaryReason = String(req.body?.extraordinaryReason || "").trim().slice(0, 2000);
     const genericResponse = {
       ok: true,
-      message: "Falls ein passendes Konto existiert, senden wir eine E-Mail.",
+      message: "Falls ein passendes aktives Abo existiert, wird die Kündigung verarbeitet.",
     };
 
     if (!email || !email.includes("@")) {
@@ -626,26 +1016,92 @@ exports.requestSubscriptionCancel = onRequest(
         return res.status(200).json(genericResponse);
       }
 
-      const crypto = require("crypto");
-      const rawToken = crypto.randomBytes(32).toString("hex");
-      const tokenHash = hashValue(rawToken);
+      const subId = userData.stripeSubscriptionId;
+
+      if (terminationType === "extraordinary") {
+        const reviewRef = await db.collection("subscriptionCancellationReviews").add({
+          uid: userRecord.uid,
+          email,
+          stripeSubscriptionId: subId,
+          terminationType: "extraordinary",
+          terminationWish: terminationDate || "immediate",
+          reason: extraordinaryReason || null,
+          status: "pending_review",
+          source: "public_website",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await userRef.set(
+          {
+            cancelSubscriptionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+            cancelSubscriptionSource: "public_website",
+            cancelSubscriptionTerminationType: "extraordinary",
+            cancelSubscriptionTerminationWish: terminationDate || "immediate",
+            cancelSubscriptionReviewId: reviewRef.id,
+            ...(extraordinaryReason ? { cancelSubscriptionExtraordinaryReason: extraordinaryReason } : {}),
+          },
+          { merge: true }
+        );
+
+        try {
+          await sendExtraordinaryCancellationReceivedEmail(userRecord, {
+            reason: extraordinaryReason,
+          });
+        } catch (mailErr) {
+          console.error("Extraordinary cancellation receipt mail could not be sent", mailErr);
+        }
+
+        try {
+          await sendExtraordinaryCancellationReviewEmail(userRecord, {
+            subscriptionId: subId,
+            reason: extraordinaryReason,
+          });
+        } catch (mailErr) {
+          console.error("Extraordinary cancellation review mail could not be sent", mailErr);
+        }
+
+        return res.status(200).json(genericResponse);
+      }
+
+      const stripe = getStripe();
+      const updated = await stripe.subscriptions.update(subId, {
+        cancel_at_period_end: true,
+      });
 
       await userRef.set(
         {
-          cancelSubscriptionToken: tokenHash,
-          cancelSubscriptionTokenExpiresAt: Date.now() + 1000 * 60 * 30,
+          stripeCancelAtPeriodEnd: true,
+          stripeSubscriptionStatus: updated.status,
           cancelSubscriptionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelSubscriptionConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelSubscriptionSource: "public_website",
+          cancelSubscriptionTerminationType: "ordinary",
+          cancelSubscriptionTerminationWish: terminationDate || "next",
+          ...(updated.current_period_end
+            ? { cancelSubscriptionEndsAt: admin.firestore.Timestamp.fromMillis(updated.current_period_end * 1000) }
+            : {}),
+          cancelSubscriptionToken: admin.firestore.FieldValue.delete(),
+          cancelSubscriptionTokenExpiresAt: admin.firestore.FieldValue.delete(),
         },
         { merge: true }
       );
 
-      const confirmBaseUrl = getConfirmSubscriptionCancelBaseUrl(req);
+      try {
+        await sendSubscriptionCancelledEmail(userRecord, {
+          periodEnd: updated.current_period_end,
+          subscriptionId: subId,
+        });
+      } catch (mailErr) {
+        console.error("Cancelled confirmation mail could not be sent", mailErr);
+      }
 
-      await sendSubscriptionCancelConfirmEmail(userRecord, rawToken, confirmBaseUrl);
       return res.status(200).json(genericResponse);
     } catch (err) {
       console.error("Cancel request error", err);
-      return res.status(200).json(genericResponse);
+      return res.status(500).json({
+        ok: false,
+        message: "Die Kündigung konnte gerade nicht verarbeitet werden.",
+      });
     }
   }
 );
@@ -954,6 +1410,17 @@ exports.handleStripeWebhook = onRequest(
               } catch (e) {
                 console.error("❌ Verify-Mail konnte nicht gesendet werden", e);
               }
+
+              try {
+                await sendSubscriptionWelcomeEmail({
+                  stripe,
+                  uid,
+                  invoice: obj,
+                  userSnap: snap.docs[0],
+                });
+              } catch (e) {
+                console.error("❌ Abo-Willkommensmail konnte nicht gesendet werden", e);
+              }
             }
           }
           break;
@@ -1038,6 +1505,66 @@ exports.sendVerifyEmail = onCall(
   async ({ auth }) => {
     if (!auth) throw new Error("Nicht eingeloggt");
     return sendVerifyEmailForUid(auth.uid);
+  }
+);
+
+exports.sendSubscriptionWelcomeEmailTest = onCall(
+  {
+    region: "europe-west1",
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+  },
+  async (request) => {
+    await requireCallableAdmin(request);
+
+    const toEmail = normalizeEmail(request.data?.toEmail);
+    if (!toEmail || !toEmail.includes("@")) {
+      throw new HttpsError("invalid-argument", "Gültige Test-E-Mail fehlt.");
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const invoiceId = `test_welcome_${Date.now()}`;
+    const mockInvoice = {
+      id: invoiceId,
+      number: `TEST-${new Date().toISOString().slice(0, 10)}`,
+      customer: null,
+      created: nowSeconds,
+      period_start: nowSeconds,
+      currency: "eur",
+      collection_method: "charge_automatically",
+      amount_paid: 1499,
+      hosted_invoice_url: FRONTEND_BASE_URL.value(),
+      lines: {
+        data: [
+          {
+            type: "subscription",
+            amount: 1499,
+            price: { unit_amount: 1499 },
+            period: { start: nowSeconds },
+          },
+        ],
+      },
+    };
+    const mockUserSnap = {
+      data: () => ({
+        firstName: request.data?.firstName || "Max",
+        lastName: request.data?.lastName || "Mustermann",
+        email: toEmail,
+      }),
+    };
+
+    const result = await sendSubscriptionWelcomeEmail({
+      stripe: getStripe(),
+      uid: request.auth.uid,
+      invoice: mockInvoice,
+      userSnap: mockUserSnap,
+      toEmailOverride: toEmail,
+    });
+
+    return {
+      ...result,
+      toEmail,
+      invoiceId,
+    };
   }
 );
 
@@ -1424,5 +1951,178 @@ exports.cleanupOldOfferRedirectsDaily = onSchedule(
     });
 
     console.log("offerRedirects daily cleanup:", result);
+  }
+);
+
+// ============================================================================
+// VERWAISTE AUTH-USER AUTOMATISCH LÖSCHEN
+// ============================================================================
+// Löscht Firebase-Auth-Konten, zu denen es KEIN users/{uid}-Dokument in
+// Firestore (mehr) gibt. n8n entfernt das Firestore-Dokument, kann aber den
+// Auth-Account nicht löschen – das übernimmt dieser nächtliche Lauf.
+//
+// SICHERHEIT gegen versehentliches Massen-Löschen:
+//  - Liefert die users-Sammlung 0 Dokumente (z. B. Lesefehler), wird sofort
+//    ABGEBROCHEN und NICHTS gelöscht. Sonst sähen alle Konten verwaist aus.
+//  - Pro Lauf werden höchstens MAX_AUTH_DELETES_PER_RUN Konten gelöscht.
+//  - Jeder Lauf (inkl. gelöschter UIDs/E-Mails) wird in authUserCleanupRuns
+//    protokolliert, damit nachvollziehbar bleibt, was passiert ist.
+const MAX_AUTH_DELETES_PER_RUN = 300;
+
+async function deleteOrphanedAuthUsers({ dryRun = false } = {}) {
+  const startedAt = new Date();
+
+  // 1) Alle vorhandenen users/{uid}-IDs einsammeln (nur IDs, keine Felder).
+  const firestoreUserIds = new Set();
+  const usersSnap = await db.collection("users").select().get();
+  usersSnap.forEach((docSnap) => firestoreUserIds.add(docSnap.id));
+
+  // SICHERHEITSABBRUCH: leere users-Sammlung => niemals löschen.
+  if (firestoreUserIds.size === 0) {
+    const reason =
+      "Abbruch: users-Sammlung lieferte 0 Dokumente – es wird nichts gelöscht.";
+    console.error("deleteOrphanedAuthUsers:", reason);
+    await db.collection("authUserCleanupRuns").add({
+      startedAt: startedAt.toISOString(),
+      dryRun,
+      aborted: true,
+      reason,
+      scannedAuthUsers: 0,
+      firestoreUsers: 0,
+      orphanCount: 0,
+      deleted: 0,
+      finishedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { aborted: true, reason, deleted: 0 };
+  }
+
+  // 2) Alle Auth-Konten durchblättern, verwaiste sammeln.
+  const orphans = [];
+  let scannedAuthUsers = 0;
+  let nextPageToken;
+  do {
+    const page = await admin.auth().listUsers(1000, nextPageToken);
+    page.users.forEach((userRecord) => {
+      scannedAuthUsers += 1;
+      if (!firestoreUserIds.has(userRecord.uid)) {
+        orphans.push({
+          uid: userRecord.uid,
+          email: userRecord.email || null,
+        });
+      }
+    });
+    nextPageToken = page.pageToken;
+  } while (nextPageToken);
+
+  const orphanCount = orphans.length;
+  const toDelete = orphans.slice(0, MAX_AUTH_DELETES_PER_RUN);
+
+  // 3) Löschen (außer dryRun). deleteUsers verarbeitet bis zu 1000 UIDs/Batch.
+  let deleted = 0;
+  const errors = [];
+  if (!dryRun) {
+    for (let i = 0; i < toDelete.length; i += 1000) {
+      const batch = toDelete.slice(i, i + 1000).map((o) => o.uid);
+      const result = await admin.auth().deleteUsers(batch);
+      deleted += result.successCount;
+      (result.errors || []).forEach((e) => {
+        errors.push({ index: e.index, message: e.error?.message || "unknown" });
+      });
+    }
+  }
+
+  const summary = {
+    startedAt: startedAt.toISOString(),
+    dryRun,
+    aborted: false,
+    scannedAuthUsers,
+    firestoreUsers: firestoreUserIds.size,
+    orphanCount,
+    capped: orphanCount > MAX_AUTH_DELETES_PER_RUN,
+    deleted,
+    errorCount: errors.length,
+  };
+
+  await db.collection("authUserCleanupRuns").add({
+    ...summary,
+    deletedAccounts: dryRun ? [] : toDelete.slice(0, 500),
+    errors: errors.slice(0, 50),
+    finishedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  console.log("deleteOrphanedAuthUsers:", summary);
+  return summary;
+}
+
+exports.deleteOrphanedAuthUsersDaily = onSchedule(
+  {
+    region: "europe-west1",
+    schedule: "0 4 * * *",
+    timeZone: "Europe/Madrid",
+    memory: "512MiB",
+    timeoutSeconds: 540,
+  },
+  async () => {
+    await deleteOrphanedAuthUsers({ dryRun: false });
+  }
+);
+
+// Manueller Trigger zum Testen: dryRun:true zeigt nur, was gelöscht würde
+// (löscht nichts); dryRun:false führt den Cleanup sofort scharf aus.
+exports.runOrphanedAuthCleanup = onCall(
+  { region: "europe-west1", memory: "512MiB", timeoutSeconds: 540 },
+  async (request) => {
+    await requireCallableAdmin(request);
+
+    const dryRun = request.data?.dryRun !== false; // Default: sicher (Dry-Run)
+    const result = await deleteOrphanedAuthUsers({ dryRun });
+    console.log("runOrphanedAuthCleanup:", {
+      by: request.auth.uid,
+      dryRun,
+      ...result,
+    });
+    return result;
+  }
+);
+
+// Admin löscht einen User in der User-Verwaltung: entfernt BEIDES –
+// das Firestore-Profil UND das Firebase-Auth-Konto. Sonst bliebe ein
+// verwaistes Auth-Konto übrig (siehe deleteOrphanedAuthUsersDaily).
+exports.adminDeleteUserAccount = onCall(
+  { region: "europe-west1" },
+  async (request) => {
+    await requireCallableAdmin(request);
+
+    const uid = String(request.data?.uid || "").trim();
+    if (!uid) {
+      throw new HttpsError("invalid-argument", "uid fehlt.");
+    }
+    if (uid === request.auth.uid) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Du kannst dein eigenes Konto hier nicht löschen."
+      );
+    }
+
+    // Firestore-Profil löschen.
+    await db.collection("users").doc(uid).delete();
+
+    // Auth-Konto löschen (falls noch vorhanden).
+    let authDeleted = false;
+    try {
+      await admin.auth().deleteUser(uid);
+      authDeleted = true;
+    } catch (err) {
+      if (err?.code !== "auth/user-not-found") {
+        throw err;
+      }
+    }
+
+    console.log("adminDeleteUserAccount:", {
+      by: request.auth.uid,
+      uid,
+      authDeleted,
+    });
+    return { uid, authDeleted };
   }
 );

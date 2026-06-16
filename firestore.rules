@@ -151,5 +151,10 @@ service cloud.firestore {
       allow read, create: if isAdmin();
       allow update, delete: if false;
     }
+
+    match /subscriptionCancellationReviews/{id} {
+      allow read, update: if isAdmin();
+      allow create, delete: if false;
+    }
   }
 }
