@@ -984,7 +984,7 @@ exports.requestSubscriptionCancel = onRequest(
     const extraordinaryReason = String(req.body?.extraordinaryReason || "").trim().slice(0, 2000);
     const genericResponse = {
       ok: true,
-      message: "Falls ein passendes aktives Abo existiert, wird die Kündigung verarbeitet.",
+      message: "Falls ein passendes aktives Abo existiert, senden wir eine Bestätigungs-E-Mail.",
     };
 
     if (!email || !email.includes("@")) {
@@ -1016,92 +1016,36 @@ exports.requestSubscriptionCancel = onRequest(
         return res.status(200).json(genericResponse);
       }
 
-      const subId = userData.stripeSubscriptionId;
-
-      if (terminationType === "extraordinary") {
-        const reviewRef = await db.collection("subscriptionCancellationReviews").add({
-          uid: userRecord.uid,
-          email,
-          stripeSubscriptionId: subId,
-          terminationType: "extraordinary",
-          terminationWish: terminationDate || "immediate",
-          reason: extraordinaryReason || null,
-          status: "pending_review",
-          source: "public_website",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        await userRef.set(
-          {
-            cancelSubscriptionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
-            cancelSubscriptionSource: "public_website",
-            cancelSubscriptionTerminationType: "extraordinary",
-            cancelSubscriptionTerminationWish: terminationDate || "immediate",
-            cancelSubscriptionReviewId: reviewRef.id,
-            ...(extraordinaryReason ? { cancelSubscriptionExtraordinaryReason: extraordinaryReason } : {}),
-          },
-          { merge: true }
-        );
-
-        try {
-          await sendExtraordinaryCancellationReceivedEmail(userRecord, {
-            reason: extraordinaryReason,
-          });
-        } catch (mailErr) {
-          console.error("Extraordinary cancellation receipt mail could not be sent", mailErr);
-        }
-
-        try {
-          await sendExtraordinaryCancellationReviewEmail(userRecord, {
-            subscriptionId: subId,
-            reason: extraordinaryReason,
-          });
-        } catch (mailErr) {
-          console.error("Extraordinary cancellation review mail could not be sent", mailErr);
-        }
-
-        return res.status(200).json(genericResponse);
-      }
-
-      const stripe = getStripe();
-      const updated = await stripe.subscriptions.update(subId, {
-        cancel_at_period_end: true,
-      });
+      const crypto = require("crypto");
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = hashValue(rawToken);
 
       await userRef.set(
         {
-          stripeCancelAtPeriodEnd: true,
-          stripeSubscriptionStatus: updated.status,
+          cancelSubscriptionToken: tokenHash,
+          cancelSubscriptionTokenExpiresAt: Date.now() + 1000 * 60 * 30,
+          cancelSubscriptionTokenUsedAt: admin.firestore.FieldValue.delete(),
           cancelSubscriptionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
-          cancelSubscriptionConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
           cancelSubscriptionSource: "public_website",
-          cancelSubscriptionTerminationType: "ordinary",
-          cancelSubscriptionTerminationWish: terminationDate || "next",
-          ...(updated.current_period_end
-            ? { cancelSubscriptionEndsAt: admin.firestore.Timestamp.fromMillis(updated.current_period_end * 1000) }
-            : {}),
-          cancelSubscriptionToken: admin.firestore.FieldValue.delete(),
-          cancelSubscriptionTokenExpiresAt: admin.firestore.FieldValue.delete(),
+          cancelSubscriptionTerminationType: terminationType,
+          cancelSubscriptionTerminationWish:
+            terminationType === "extraordinary"
+              ? terminationDate || "immediate"
+              : terminationDate || "next",
+          cancelSubscriptionReviewId: admin.firestore.FieldValue.delete(),
+          ...(extraordinaryReason
+            ? { cancelSubscriptionExtraordinaryReason: extraordinaryReason }
+            : { cancelSubscriptionExtraordinaryReason: admin.firestore.FieldValue.delete() }),
         },
         { merge: true }
       );
 
-      try {
-        await sendSubscriptionCancelledEmail(userRecord, {
-          periodEnd: updated.current_period_end,
-          subscriptionId: subId,
-        });
-      } catch (mailErr) {
-        console.error("Cancelled confirmation mail could not be sent", mailErr);
-      }
-
+      const confirmBaseUrl = getConfirmSubscriptionCancelBaseUrl(req);
+      await sendSubscriptionCancelConfirmEmail(userRecord, rawToken, confirmBaseUrl);
       return res.status(200).json(genericResponse);
     } catch (err) {
       console.error("Cancel request error", err);
-      return res.status(500).json({
-        ok: false,
-        message: "Die Kündigung konnte gerade nicht verarbeitet werden.",
-      });
+      return res.status(200).json(genericResponse);
     }
   }
 );
@@ -1155,15 +1099,36 @@ exports.confirmSubscriptionCancel = onRequest(
       ));
     }
 
+    const terminationType =
+      userData.cancelSubscriptionTerminationType === "extraordinary"
+        ? "extraordinary"
+        : "ordinary";
+
     if (req.method === "GET") {
       const action = `?token=${encodeURIComponent(token)}`;
+      const title = terminationType === "extraordinary"
+        ? "Außerordentliche Kündigung einreichen"
+        : "Abo kündigen";
+      const heading = terminationType === "extraordinary"
+        ? "Außerordentliche Kündigung wirklich einreichen?"
+        : "Abo wirklich kündigen?";
+      const description = terminationType === "extraordinary"
+        ? "Wenn du bestätigst, reichen wir deine außerordentliche Kündigung zur manuellen Prüfung ein."
+        : "Wenn du bestätigst, wird dein Immobot-Abo zum Ende des bereits bezahlten Zeitraums gekündigt.";
+      const secondaryDescription = terminationType === "extraordinary"
+        ? "Wir bestätigen dir den Eingang per E-Mail und melden uns nach der Prüfung."
+        : "Bis dahin kannst du Immobot weiter nutzen.";
+      const buttonText = terminationType === "extraordinary"
+        ? "Kündigung einreichen"
+        : "Abo jetzt kündigen";
+
       return res.status(200).send(htmlPage(
-        "Abo kündigen",
-        `<h1>Abo wirklich kündigen?</h1>
-        <p>Wenn du bestätigst, wird dein Immobot-Abo zum Ende des bereits bezahlten Zeitraums gekündigt.</p>
-        <p>Bis dahin kannst du Immobot weiter nutzen.</p>
+        title,
+        `<h1>${heading}</h1>
+        <p>${description}</p>
+        <p>${secondaryDescription}</p>
         <form method="POST" action="${action}" class="actions">
-          <button type="submit">Abo jetzt kündigen</button>
+          <button type="submit">${buttonText}</button>
           <a class="secondary" href="${FRONTEND_BASE_URL.value()}/login">Abbrechen</a>
         </form>
         <p class="muted">Dieser Link ist nur einmal verwendbar.</p>`
@@ -1183,6 +1148,57 @@ exports.confirmSubscriptionCancel = onRequest(
         ));
       }
 
+      const userRecord = await admin.auth().getUser(uid).catch(() => null);
+
+      if (terminationType === "extraordinary") {
+        const reviewRef = await db.collection("subscriptionCancellationReviews").add({
+          uid,
+          email: userRecord?.email || userData.email || null,
+          stripeSubscriptionId: subId,
+          terminationType: "extraordinary",
+          terminationWish: userData.cancelSubscriptionTerminationWish || "immediate",
+          reason: userData.cancelSubscriptionExtraordinaryReason || null,
+          status: "pending_review",
+          source: userData.cancelSubscriptionSource || "public_website",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await userRef.set(
+          {
+            cancelSubscriptionReviewId: reviewRef.id,
+            cancelSubscriptionTokenUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+            cancelSubscriptionConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+            cancelSubscriptionToken: admin.firestore.FieldValue.delete(),
+            cancelSubscriptionTokenExpiresAt: admin.firestore.FieldValue.delete(),
+          },
+          { merge: true }
+        );
+
+        if (userRecord?.email) {
+          try {
+            await sendExtraordinaryCancellationReceivedEmail(userRecord, {
+              reason: userData.cancelSubscriptionExtraordinaryReason,
+            });
+          } catch (mailErr) {
+            console.error("Extraordinary cancellation receipt mail could not be sent", mailErr);
+          }
+
+          try {
+            await sendExtraordinaryCancellationReviewEmail(userRecord, {
+              subscriptionId: subId,
+              reason: userData.cancelSubscriptionExtraordinaryReason,
+            });
+          } catch (mailErr) {
+            console.error("Extraordinary cancellation review mail could not be sent", mailErr);
+          }
+        }
+
+        return res.status(200).send(htmlPage(
+          "Kündigung eingereicht",
+          `<h1>Außerordentliche Kündigung eingereicht</h1><p>Deine außerordentliche Kündigung ist eingegangen und wird geprüft.</p><p>Wir haben dir dazu gerade eine Bestätigung per E-Mail gesendet.</p>`
+        ));
+      }
+
       const stripe = getStripe();
       const updated = await stripe.subscriptions.update(subId, {
         cancel_at_period_end: true,
@@ -1194,16 +1210,24 @@ exports.confirmSubscriptionCancel = onRequest(
           stripeSubscriptionStatus: updated.status,
           cancelSubscriptionTokenUsedAt: admin.firestore.FieldValue.serverTimestamp(),
           cancelSubscriptionConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelSubscriptionSource: userData.cancelSubscriptionSource || "public_website",
+          cancelSubscriptionTerminationType: "ordinary",
+          cancelSubscriptionTerminationWish: userData.cancelSubscriptionTerminationWish || "next",
+          ...(updated.current_period_end
+            ? { cancelSubscriptionEndsAt: admin.firestore.Timestamp.fromMillis(updated.current_period_end * 1000) }
+            : {}),
           cancelSubscriptionToken: admin.firestore.FieldValue.delete(),
           cancelSubscriptionTokenExpiresAt: admin.firestore.FieldValue.delete(),
         },
         { merge: true }
       );
 
-      const userRecord = await admin.auth().getUser(uid).catch(() => null);
       if (userRecord?.email) {
         try {
-          await sendSubscriptionCancelledEmail(userRecord);
+          await sendSubscriptionCancelledEmail(userRecord, {
+            periodEnd: updated.current_period_end,
+            subscriptionId: subId,
+          });
         } catch (mailErr) {
           console.error("Cancelled confirmation mail could not be sent", mailErr);
         }

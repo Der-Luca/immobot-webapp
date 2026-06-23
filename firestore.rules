@@ -36,7 +36,13 @@ service cloud.firestore {
         "cancelSubscriptionTokenExpiresAt",
         "cancelSubscriptionTokenUsedAt",
         "cancelSubscriptionRequestedAt",
-        "cancelSubscriptionConfirmedAt"
+        "cancelSubscriptionConfirmedAt",
+        "cancelSubscriptionSource",
+        "cancelSubscriptionTerminationType",
+        "cancelSubscriptionTerminationWish",
+        "cancelSubscriptionReviewId",
+        "cancelSubscriptionExtraordinaryReason",
+        "cancelSubscriptionEndsAt"
       ];
     }
 
