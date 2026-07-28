@@ -28,6 +28,14 @@ export default function AdminUserDetails() {
   const [dangerAction, setDangerAction] = useState(null);
   const [dangerMessage, setDangerMessage] = useState(null);
 
+  const handleUserUpdated = (nextUserData) => {
+    setUser((current) => ({
+      ...current,
+      ...nextUserData,
+      uid,
+    }));
+  };
+
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -146,10 +154,11 @@ export default function AdminUserDetails() {
   
   // Status Farbe
   const status = user.stripeStatus || "free";
+  const normalizedStatus = status === "canceled" ? "cancelled" : status;
   const isPremium = status === "paid" || status === "active";
   const statusColors = isPremium 
     ? "bg-emerald-100 text-emerald-700 border-emerald-200" 
-    : status === "canceled" 
+    : normalizedStatus === "cancelled" 
     ? "bg-red-50 text-red-600 border-red-100" 
     : "bg-gray-100 text-gray-600 border-gray-200";
 
@@ -332,7 +341,7 @@ export default function AdminUserDetails() {
             
             {/* ZAHLUNGEN */}
             <SectionContainer title="Zahlungen & Abos">
-              <UserPayments user={user} />
+              <UserPayments user={user} onUserUpdated={handleUserUpdated} />
             </SectionContainer>
 
             {/* KLICK HISTORIE */}

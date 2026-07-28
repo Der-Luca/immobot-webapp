@@ -26,9 +26,62 @@ function formatDate(value) {
   });
 }
 
+const requestStatusLabels = {
+  received: {
+    label: "Empfangen",
+    className: "border-gray-200 bg-gray-100 text-gray-700",
+  },
+  invalid_email: {
+    label: "E-Mail ungültig",
+    className: "border-red-200 bg-red-50 text-red-700",
+  },
+  rate_limited: {
+    label: "Rate Limit",
+    className: "border-red-200 bg-red-50 text-red-700",
+  },
+  rate_limit_error: {
+    label: "Rate-Limit-Fehler",
+    className: "border-red-200 bg-red-50 text-red-700",
+  },
+  user_not_found: {
+    label: "User nicht gefunden",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  no_active_subscription: {
+    label: "Kein aktives Abo",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  already_cancel_requested: {
+    label: "Bereits vorgemerkt",
+    className: "border-sky-200 bg-sky-50 text-sky-800",
+  },
+  email_sent: {
+    label: "Mail gesendet",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  },
+  error: {
+    label: "Fehler",
+    className: "border-red-200 bg-red-50 text-red-700",
+  },
+};
+
+function RequestStatusBadge({ status }) {
+  const config = requestStatusLabels[status] || {
+    label: status || "Unbekannt",
+    className: "border-gray-200 bg-gray-100 text-gray-700",
+  };
+
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${config.className}`}>
+      {config.label}
+    </span>
+  );
+}
+
 export default function AdminCancellations() {
   const [reviews, setReviews] = useState([]);
   const [ordinaryRequests, setOrdinaryRequests] = useState([]);
+  const [requestLogs, setRequestLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
@@ -47,12 +100,19 @@ export default function AdminCancellations() {
         collection(db, "users"),
         where("cancelSubscriptionTerminationType", "==", "ordinary")
       );
-      const [reviewSnap, userSnap] = await Promise.all([
+      const logQuery = query(
+        collection(db, "subscriptionCancellationRequestLogs"),
+        orderBy("createdAt", "desc"),
+        limit(100)
+      );
+      const [reviewSnap, userSnap, logSnap] = await Promise.all([
         getDocs(reviewQuery),
         getDocs(userQuery),
+        getDocs(logQuery),
       ]);
 
       setReviews(reviewSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setRequestLogs(logSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setOrdinaryRequests(
         userSnap.docs
           .map((d) => ({ uid: d.id, ...d.data() }))
@@ -136,6 +196,107 @@ export default function AdminCancellations() {
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <strong>{pendingReviews.length}</strong> außerordentliche Kündigung
           {pendingReviews.length === 1 ? "" : "en"} zur Prüfung.
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
+          <h2 className="font-bold text-gray-900">Webhook-Tracking</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Letzte Kündigungsanfragen mit eingegebener E-Mail und internem Ergebnis.
+          </p>
+        </div>
+        <div className="overflow-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-gray-700">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Zeitpunkt</th>
+                <th className="px-5 py-3 font-semibold">Eingegebene E-Mail</th>
+                <th className="px-5 py-3 font-semibold">Status</th>
+                <th className="px-5 py-3 font-semibold">Grund</th>
+                <th className="px-5 py-3 font-semibold">User / Abo</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-5 py-10 text-center text-gray-500">
+                    Lade Tracking...
+                  </td>
+                </tr>
+              ) : requestLogs.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-5 py-10 text-center text-gray-500">
+                    Noch keine Kündigungsanfragen im Tracking.
+                  </td>
+                </tr>
+              ) : (
+                requestLogs.map((log) => (
+                  <tr key={log.id} className="align-top hover:bg-gray-50">
+                    <td className="px-5 py-4 text-gray-600 whitespace-nowrap">
+                      <div>{formatDate(log.createdAt)}</div>
+                      {log.updatedAt && (
+                        <div className="mt-1 text-xs text-gray-400">
+                          Update: {formatDate(log.updatedAt)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-medium text-gray-900">
+                        {log.enteredEmail || log.normalizedEmail || "—"}
+                      </div>
+                      {log.normalizedEmail && log.normalizedEmail !== log.enteredEmail && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          normalisiert: {log.normalizedEmail}
+                        </div>
+                      )}
+                      <div className="mt-1 text-xs text-gray-400">
+                        {log.terminationType === "extraordinary" ? "Außerordentlich" : "Normal"}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <RequestStatusBadge status={log.status} />
+                    </td>
+                    <td className="max-w-md px-5 py-4 text-gray-700">
+                      <div className="whitespace-pre-wrap break-words">
+                        {log.reason || "—"}
+                      </div>
+                      {log.hasExtraordinaryReason && log.extraordinaryReason && (
+                        <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2 text-xs text-gray-600">
+                          {log.extraordinaryReason}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-gray-600">
+                      {log.uid ? (
+                        <Link
+                          to={`/admin/user/${log.uid}`}
+                          className="font-mono text-xs text-indigo-600 hover:underline"
+                        >
+                          {log.uid}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-400">Kein User</span>
+                      )}
+                      <div className="mt-1 font-mono text-xs text-gray-400">
+                        {log.stripeSubscriptionId || "Keine Subscription"}
+                      </div>
+                      {log.stripeSubscriptionRecoveredFromCustomer && (
+                        <div className="mt-1 text-xs font-medium text-emerald-700">
+                          aus Stripe-Kunde wiederhergestellt
+                        </div>
+                      )}
+                      {(log.stripeStatus || log.stripeSubscriptionStatus) && (
+                        <div className="mt-1 text-xs text-gray-400">
+                          {log.stripeStatus || "—"} / {log.stripeSubscriptionStatus || "—"}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

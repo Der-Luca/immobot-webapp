@@ -56,6 +56,135 @@ const getStripe = () => {
   return require("stripe")(STRIPE_SECRET.value());
 };
 
+const CANCELLABLE_SUBSCRIPTION_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+]);
+
+const ADMIN_STRIPE_ACTIONS = new Set([
+  "sync",
+  "cancel_at_period_end",
+  "reactivate",
+  "cancel_now",
+]);
+
+const ADMIN_APP_STRIPE_STATUSES = new Set([
+  "none",
+  "paid",
+  "cancelled",
+  "payment_failed",
+  "checkout_started",
+  "pending",
+]);
+
+async function findCancellableSubscription(stripe, customerId) {
+  if (!customerId) return null;
+
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+
+  return subscriptions.data.find((subscription) =>
+    CANCELLABLE_SUBSCRIPTION_STATUSES.has(subscription.status)
+  ) || null;
+}
+
+async function findLatestSubscription(stripe, customerId) {
+  if (!customerId) return null;
+
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+
+  return subscriptions.data[0] || null;
+}
+
+async function getStoredOrLatestSubscription(stripe, userData = {}) {
+  if (userData.stripeSubscriptionId) {
+    try {
+      return await stripe.subscriptions.retrieve(userData.stripeSubscriptionId);
+    } catch (err) {
+      if (err?.code !== "resource_missing") throw err;
+    }
+  }
+
+  return findLatestSubscription(stripe, userData.stripeCustomerId);
+}
+
+function appStatusFromStripeSubscription(subscription) {
+  if (!subscription) return "none";
+
+  if (subscription.status === "canceled") return "cancelled";
+  if (subscription.status === "active" || subscription.status === "trialing") return "paid";
+  if (subscription.status === "past_due" || subscription.status === "unpaid") return "payment_failed";
+  return "pending";
+}
+
+function stripeSubscriptionSnapshot(subscription) {
+  if (!subscription) {
+    return {
+      stripeStatus: "none",
+      stripeSubscriptionStatus: admin.firestore.FieldValue.delete(),
+      stripeCancelAtPeriodEnd: admin.firestore.FieldValue.delete(),
+      stripeCurrentPeriodEnd: admin.firestore.FieldValue.delete(),
+    };
+  }
+
+  return {
+    stripeStatus: appStatusFromStripeSubscription(subscription),
+    stripeSubscriptionId: subscription.id,
+    stripeSubscriptionStatus: subscription.status,
+    stripeCancelAtPeriodEnd: subscription.cancel_at_period_end === true,
+    ...(subscription.current_period_end
+      ? { stripeCurrentPeriodEnd: admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000) }
+      : { stripeCurrentPeriodEnd: admin.firestore.FieldValue.delete() }),
+  };
+}
+
+async function resolveUserSubscription(stripe, userRef, userData = {}) {
+  if (userData.stripeSubscriptionId) {
+    return {
+      subscriptionId: userData.stripeSubscriptionId,
+      subscription: null,
+      recoveredFromCustomer: false,
+    };
+  }
+
+  const subscription = await findCancellableSubscription(stripe, userData.stripeCustomerId);
+  if (!subscription) {
+    return {
+      subscriptionId: null,
+      subscription: null,
+      recoveredFromCustomer: false,
+    };
+  }
+
+  await userRef.set(
+    {
+      stripeSubscriptionId: subscription.id,
+      stripeSubscriptionStatus: subscription.status,
+      stripeStatus: "paid",
+      stripeCancelAtPeriodEnd: subscription.cancel_at_period_end === true,
+      ...(subscription.current_period_end
+        ? { stripeCurrentPeriodEnd: admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000) }
+        : {}),
+    },
+    { merge: true }
+  );
+
+  return {
+    subscriptionId: subscription.id,
+    subscription,
+    recoveredFromCustomer: true,
+  };
+}
+
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
@@ -71,6 +200,44 @@ function getClientIp(req) {
     return forwarded.split(",")[0].trim();
   }
   return req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function getRequestUserAgent(req) {
+  return String(req.headers["user-agent"] || "").slice(0, 500);
+}
+
+async function createCancellationRequestLog(req, details = {}) {
+  try {
+    const ref = db.collection("subscriptionCancellationRequestLogs").doc();
+    await ref.set({
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ip: getClientIp(req),
+      userAgent: getRequestUserAgent(req),
+      origin: String(req.headers.origin || "").slice(0, 300),
+      status: "received",
+      ...details,
+    });
+    return ref;
+  } catch (err) {
+    console.error("Cancellation request log could not be created", err);
+    return null;
+  }
+}
+
+async function updateCancellationRequestLog(logRef, details = {}) {
+  if (!logRef) return;
+  try {
+    await logRef.set(
+      {
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...details,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error("Cancellation request log could not be updated", err);
+  }
 }
 
 function setCorsHeaders(req, res) {
@@ -910,7 +1077,11 @@ exports.cancelSubscriptionAtPeriodEnd = onCall(
     const stripe = getStripe();
     const userRef = db.collection("users").doc(uid);
     const snap = await userRef.get();
-    const subId = snap.data()?.stripeSubscriptionId;
+    const { subscriptionId: subId } = await resolveUserSubscription(
+      stripe,
+      userRef,
+      snap.data() || {}
+    );
 
     if (!subId) throw new Error("Keine Subscription gefunden.");
 
@@ -942,7 +1113,11 @@ exports.reactivateSubscription = onCall(
     const stripe = getStripe();
     const userRef = db.collection("users").doc(uid);
     const snap = await userRef.get();
-    const subId = snap.data()?.stripeSubscriptionId;
+    const { subscriptionId: subId } = await resolveUserSubscription(
+      stripe,
+      userRef,
+      snap.data() || {}
+    );
 
     if (!subId) throw new Error("Keine Subscription gefunden.");
 
@@ -963,6 +1138,127 @@ exports.reactivateSubscription = onCall(
 );
 
 // ============================================================================
+// ADMIN: MANAGE USER STRIPE / APP PAYMENT STATE
+// ============================================================================
+exports.adminManageUserPaymentState = onCall(
+  { region: "europe-west1" },
+  async (request) => {
+    await requireCallableAdmin(request);
+
+    const uid = String(request.data?.uid || "").trim();
+    const mode = String(request.data?.mode || "").trim();
+    const note = String(request.data?.note || "").trim().slice(0, 1000);
+
+    if (!uid) {
+      throw new HttpsError("invalid-argument", "uid fehlt.");
+    }
+
+    const userRef = db.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", "User nicht gefunden.");
+    }
+
+    const userData = userSnap.data() || {};
+    const adminAudit = {
+      stripeAdminLastAction: mode,
+      stripeAdminLastActionAt: admin.firestore.FieldValue.serverTimestamp(),
+      stripeAdminLastActionBy: request.auth.uid,
+      ...(note
+        ? { stripeAdminLastActionNote: note }
+        : { stripeAdminLastActionNote: admin.firestore.FieldValue.delete() }),
+    };
+
+    if (mode === "app_status_override") {
+      const stripeStatus = String(request.data?.stripeStatus || "").trim();
+      if (!ADMIN_APP_STRIPE_STATUSES.has(stripeStatus)) {
+        throw new HttpsError("invalid-argument", "Ungültiger Immobot-Status.");
+      }
+
+      await userRef.set(
+        {
+          stripeStatus,
+          stripeStatusManualOverride: true,
+          stripeStatusManualOverrideAt: admin.firestore.FieldValue.serverTimestamp(),
+          stripeStatusManualOverrideBy: request.auth.uid,
+          ...adminAudit,
+        },
+        { merge: true }
+      );
+
+      const updatedSnap = await userRef.get();
+      console.log("adminManageUserPaymentState: app override", {
+        by: request.auth.uid,
+        uid,
+        stripeStatus,
+      });
+      return { ok: true, user: updatedSnap.data() || {} };
+    }
+
+    const action = String(request.data?.action || "").trim();
+    if (mode !== "stripe_action" || !ADMIN_STRIPE_ACTIONS.has(action)) {
+      throw new HttpsError("invalid-argument", "Ungültige Admin-Aktion.");
+    }
+
+    const stripe = getStripe();
+    let subscription = await getStoredOrLatestSubscription(stripe, userData);
+
+    if (!subscription && action !== "sync") {
+      throw new HttpsError("failed-precondition", "Keine Stripe-Subscription gefunden.");
+    }
+
+    if (action === "cancel_at_period_end") {
+      if (subscription.status === "canceled") {
+        throw new HttpsError("failed-precondition", "Das Abo ist bereits beendet.");
+      }
+      subscription = await stripe.subscriptions.update(subscription.id, {
+        cancel_at_period_end: true,
+      });
+    }
+
+    if (action === "reactivate") {
+      if (subscription.status === "canceled") {
+        throw new HttpsError("failed-precondition", "Ein bereits beendetes Abo kann nicht reaktiviert werden.");
+      }
+      subscription = await stripe.subscriptions.update(subscription.id, {
+        cancel_at_period_end: false,
+      });
+    }
+
+    if (action === "cancel_now") {
+      if (subscription.status === "canceled") {
+        throw new HttpsError("failed-precondition", "Das Abo ist bereits beendet.");
+      }
+      subscription = await stripe.subscriptions.cancel(subscription.id, {
+        invoice_now: false,
+        prorate: false,
+      });
+    }
+
+    const snapshot = stripeSubscriptionSnapshot(subscription);
+    await userRef.set(
+      {
+        ...snapshot,
+        stripeStatusManualOverride: admin.firestore.FieldValue.delete(),
+        stripeStatusSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...adminAudit,
+      },
+      { merge: true }
+    );
+
+    const updatedSnap = await userRef.get();
+    console.log("adminManageUserPaymentState: stripe action", {
+      by: request.auth.uid,
+      uid,
+      action,
+      subscriptionId: subscription?.id || null,
+      subscriptionStatus: subscription?.status || null,
+    });
+    return { ok: true, user: updatedSnap.data() || {} };
+  }
+);
+
+// ============================================================================
 // REQUEST SUBSCRIPTION CANCELLATION FROM PUBLIC WEBSITE
 // ============================================================================
 exports.requestSubscriptionCancel = onRequest(
@@ -975,7 +1271,8 @@ exports.requestSubscriptionCancel = onRequest(
     if (req.method === "OPTIONS") return res.status(204).send("");
     if (req.method !== "POST") return res.status(405).json({ ok: false });
 
-    const email = normalizeEmail(req.body?.email);
+    const enteredEmail = String(req.body?.email || "").trim().slice(0, 320);
+    const email = normalizeEmail(enteredEmail);
     const terminationType =
       String(req.body?.terminationType || "ordinary") === "extraordinary"
         ? "extraordinary"
@@ -986,8 +1283,20 @@ exports.requestSubscriptionCancel = onRequest(
       ok: true,
       message: "Falls ein passendes aktives Abo existiert, senden wir eine Bestätigungs-E-Mail.",
     };
+    const logRef = await createCancellationRequestLog(req, {
+      enteredEmail,
+      normalizedEmail: email || null,
+      terminationType,
+      terminationDate,
+      hasExtraordinaryReason: Boolean(extraordinaryReason),
+      extraordinaryReason: extraordinaryReason || null,
+    });
 
     if (!email || !email.includes("@")) {
+      await updateCancellationRequestLog(logRef, {
+        status: "invalid_email",
+        reason: "Die eingegebene E-Mail ist leer oder formal ungültig.",
+      });
       return res.status(200).json(genericResponse);
     }
 
@@ -995,24 +1304,66 @@ exports.requestSubscriptionCancel = onRequest(
       await checkCancelRequestRateLimit(email, getClientIp(req));
     } catch (err) {
       if (err.message === "RATE_LIMITED") {
+        await updateCancellationRequestLog(logRef, {
+          status: "rate_limited",
+          reason: "Rate Limit für diese E-Mail/IP erreicht.",
+        });
         return res.status(429).json({
           ok: false,
           message: "Bitte versuche es später erneut.",
         });
       }
       console.error("Cancel request rate limit error", err);
+      await updateCancellationRequestLog(logRef, {
+        status: "rate_limit_error",
+        reason: err.message || "Rate-Limit-Prüfung fehlgeschlagen.",
+      });
       return res.status(500).json({ ok: false });
     }
 
     try {
       const userRecord = await admin.auth().getUserByEmail(email).catch(() => null);
-      if (!userRecord) return res.status(200).json(genericResponse);
+      if (!userRecord) {
+        await updateCancellationRequestLog(logRef, {
+          status: "user_not_found",
+          reason: "Zu dieser E-Mail wurde kein Firebase-Auth-User gefunden.",
+        });
+        return res.status(200).json(genericResponse);
+      }
 
       const userRef = db.collection("users").doc(userRecord.uid);
       const userSnap = await userRef.get();
       const userData = userSnap.data() || {};
+      const stripe = getStripe();
+      const {
+        subscriptionId,
+        subscription,
+        recoveredFromCustomer,
+      } = await resolveUserSubscription(stripe, userRef, userData);
+      const stripeCancelAtPeriodEnd =
+        subscription?.cancel_at_period_end === true ||
+        userData.stripeCancelAtPeriodEnd === true;
 
-      if (!userData.stripeSubscriptionId || userData.stripeCancelAtPeriodEnd === true) {
+      await updateCancellationRequestLog(logRef, {
+        uid: userRecord.uid,
+        userEmail: userRecord.email || email,
+        hasUserDocument: userSnap.exists,
+        stripeSubscriptionId: subscriptionId || null,
+        stripeSubscriptionRecoveredFromCustomer: recoveredFromCustomer,
+        stripeCancelAtPeriodEnd,
+        stripeStatus: userData.stripeStatus || null,
+        stripeSubscriptionStatus: subscription?.status || userData.stripeSubscriptionStatus || null,
+      });
+
+      if (!subscriptionId || stripeCancelAtPeriodEnd) {
+        await updateCancellationRequestLog(logRef, {
+          status: stripeCancelAtPeriodEnd
+            ? "already_cancel_requested"
+            : "no_active_subscription",
+          reason: stripeCancelAtPeriodEnd
+            ? "Für diesen User ist die Kündigung bereits vorgemerkt."
+            : "Beim User ist keine kündbare Stripe-Subscription gespeichert oder in Stripe gefunden.",
+        });
         return res.status(200).json(genericResponse);
       }
 
@@ -1042,9 +1393,18 @@ exports.requestSubscriptionCancel = onRequest(
 
       const confirmBaseUrl = getConfirmSubscriptionCancelBaseUrl(req);
       await sendSubscriptionCancelConfirmEmail(userRecord, rawToken, confirmBaseUrl);
+      await updateCancellationRequestLog(logRef, {
+        status: "email_sent",
+        reason: "Bestätigungs-E-Mail wurde ausgelöst.",
+        emailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
       return res.status(200).json(genericResponse);
     } catch (err) {
       console.error("Cancel request error", err);
+      await updateCancellationRequestLog(logRef, {
+        status: "error",
+        reason: err.message || "Unbekannter Fehler bei der Kündigungsanfrage.",
+      });
       return res.status(200).json(genericResponse);
     }
   }

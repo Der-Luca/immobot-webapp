@@ -28,10 +28,19 @@ service cloud.firestore {
         "stripeCustomerId",
         "stripeSubscriptionId",
         "stripeSubscriptionStatus",
+        "stripeCurrentPeriodEnd",
         "stripeCancelAtPeriodEnd",
         "stripeCheckoutSessionId",
         "stripeLastPayment",
         "stripeLastPaymentError",
+        "stripeStatusManualOverride",
+        "stripeStatusManualOverrideAt",
+        "stripeStatusManualOverrideBy",
+        "stripeStatusSyncedAt",
+        "stripeAdminLastAction",
+        "stripeAdminLastActionAt",
+        "stripeAdminLastActionBy",
+        "stripeAdminLastActionNote",
         "cancelSubscriptionToken",
         "cancelSubscriptionTokenExpiresAt",
         "cancelSubscriptionTokenUsedAt",
@@ -161,6 +170,11 @@ service cloud.firestore {
     match /subscriptionCancellationReviews/{id} {
       allow read, update: if isAdmin();
       allow create, delete: if false;
+    }
+
+    match /subscriptionCancellationRequestLogs/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
   }
 }
