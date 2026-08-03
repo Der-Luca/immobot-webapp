@@ -17,8 +17,7 @@ export default function RegisterFinish() {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
 
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [acceptLegalConsent, setAcceptLegalConsent] = useState(false);
 
   const [showPw, setShowPw] = useState(false);
   const [showPw2, setShowPw2] = useState(false);
@@ -27,7 +26,7 @@ export default function RegisterFinish() {
 
   const canSubmit =
     !busy &&
-    acceptTerms &&
+    acceptLegalConsent &&
     firstName.trim() &&
     lastName.trim() &&
     email.trim() &&
@@ -75,8 +74,11 @@ export default function RegisterFinish() {
         // Custom Double Opt-In
         customEmailVerified: false,
         allowMail: true,
-        marketingOptIn,
         acceptedTermsAt: serverTimestamp(),
+        acceptedWithdrawalNoticeAt: serverTimestamp(),
+        acceptedImmediateDigitalContentStartAt: serverTimestamp(),
+        acceptedDigitalContentWithdrawalLossAt: serverTimestamp(),
+        legalConsentVersion: "register-finish-fagg-v1",
         createdAt: serverTimestamp(),
       };
 
@@ -230,12 +232,12 @@ export default function RegisterFinish() {
             <input
               type="checkbox"
               className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              checked={acceptTerms}
-              onChange={(e) => setAcceptTerms(e.target.checked)}
+              checked={acceptLegalConsent}
+              onChange={(e) => setAcceptLegalConsent(e.target.checked)}
               required
             />
             <span className="text-gray-700">
-              Ich akzeptiere die{" "}
+              Ich habe die{" "}
               <Link
                 to="/terms"
                 className="underline text-blue-600"
@@ -245,26 +247,16 @@ export default function RegisterFinish() {
               </Link>{" "}
               und die{" "}
               <Link
-                to="/privacy"
+                to="/withdrawal"
                 className="underline text-blue-600"
                 target="_blank"
               >
-                Datenschutzerklärung
+                Rücktrittsbelehrung
               </Link>
-              .
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              checked={marketingOptIn}
-              onChange={(e) => setMarketingOptIn(e.target.checked)}
-            />
-            <span className="text-gray-700">
-              Ich möchte hilfreiche Updates & Angebote per E-Mail erhalten
-              (optional).
+              {" "}gelesen und akzeptiere diese. Ich stimme ausdrücklich zu,
+              dass mit der Bereitstellung der digitalen Inhalte sofort begonnen
+              wird und ich dadurch mein Rücktrittsrecht gem. § 18 Abs. 1 Z 11
+              FAGG verliere.
             </span>
           </label>
         </div>
