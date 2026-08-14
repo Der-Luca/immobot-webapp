@@ -16,6 +16,15 @@ export function useCookieConsent() {
   const [loading, setLoading] = useState(Boolean(user?.uid));
 
   useEffect(() => {
+    function syncFromLocal(event) {
+      setAccepted(event?.detail?.accepted === true || hasAcceptedCookies());
+    }
+
+    window.addEventListener("cookie-consent-updated", syncFromLocal);
+    return () => window.removeEventListener("cookie-consent-updated", syncFromLocal);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function load() {

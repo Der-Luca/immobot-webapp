@@ -10,6 +10,7 @@ import AdminOffers from "./pages/admin/offers/AdminOffers";
 import AdminOfferDetails from "./pages/admin/offers/AdminOfferDetails";
 import AdminCleanup from "./pages/admin/cleanup/AdminCleanup";
 import AdminCancellations from "./pages/admin/cancellations/AdminCancellations";
+import CookieConsentManager from "./components/CookieConsentManager";
 
 // Register-Flow (öffentlich)
 import Step1 from "./pages/public/register/Step1";
@@ -18,6 +19,7 @@ import Step3 from "./pages/public/register/Step3";
 import Step4Optional from "./pages/public/register/Step4Optional";
 import Step5Optional from "./pages/public/register/Step5Optional";
 import RegisterFinish from "./pages/public/register/RegisterFinish";
+import RegisterCookieGate from "./pages/public/register/RegisterCookieGate";
 
 // Geschützte Bereiche
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -37,6 +39,7 @@ import CheckoutRedirect from "./pages/public/register/CheckoutRedirect";
 
 export default function App() {
   return (
+    <>
     <Routes>
       {/* PUBLIC */}
         <Route index element={<RootRedirect />} />
@@ -58,7 +61,7 @@ export default function App() {
   path="/register"
   element={
     <PublicOnlyRoute>
-      <Outlet />
+      <RegisterCookieGate />
     </PublicOnlyRoute>
   }
 >
@@ -111,5 +114,7 @@ export default function App() {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    <CookieConsentManager />
+    </>
   );
 }

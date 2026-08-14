@@ -1,7 +1,8 @@
 export default function CookieConsentNotice({
   onAccept,
-  title = "Wir nutzen Cookies",
-  text = "Für das volle Immobot-Erlebnis benötigen wir deine Zustimmung.",
+  onDecline,
+  title = "Karte erst nach Zustimmung laden",
+  text = "Für die Kartenansicht laden wir Dienste von MapTiler und Leaflet. Dabei können Daten an Drittanbieter übermittelt werden.",
   className = "",
   compact = false,
 }) {
@@ -54,15 +55,29 @@ export default function CookieConsentNotice({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onAccept}
-        className={`rounded-xl bg-blue-600 font-bold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 ${
-          compact ? "px-5 py-2.5 text-sm" : "px-8 py-4 text-base md:text-lg"
-        }`}
-      >
-        Cookies akzeptieren
-      </button>
+      <div className={`flex flex-wrap items-center justify-center gap-3 ${compact ? "" : "mt-1"}`}>
+        <button
+          type="button"
+          onClick={onAccept}
+          className={`rounded-xl bg-blue-600 font-bold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 ${
+            compact ? "px-5 py-2.5 text-sm" : "px-8 py-4 text-base md:text-lg"
+          }`}
+        >
+          Zustimmen
+        </button>
+
+        {onDecline && (
+          <button
+            type="button"
+            onClick={onDecline}
+            className={`rounded-xl border border-gray-300 bg-white font-bold text-gray-700 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-200 ${
+              compact ? "px-5 py-2.5 text-sm" : "px-8 py-4 text-base md:text-lg"
+            }`}
+          >
+            Ohne Karte weiter
+          </button>
+        )}
+      </div>
     </div>
   );
 }

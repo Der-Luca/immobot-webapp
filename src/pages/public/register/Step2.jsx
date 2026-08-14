@@ -29,6 +29,15 @@ export default function Step2() {
   const mapRef = useRef(null);
   const leafletRef = useRef({ L: null, map: null, marker: null, circle: null });
 
+  useEffect(() => {
+    function syncCookieConsent(event) {
+      setCookiesAccepted(event?.detail?.accepted === true || hasAcceptedCookies());
+    }
+
+    window.addEventListener("cookie-consent-updated", syncCookieConsent);
+    return () => window.removeEventListener("cookie-consent-updated", syncCookieConsent);
+  }, []);
+
   // ------------------------------------------------------------
   // Marker + Radius zeichnen
   // ------------------------------------------------------------
@@ -197,38 +206,7 @@ export default function Step2() {
     drawMarkerAndCircle(item.lat, item.lon, radius);
   }
 
-  if (!cookiesAccepted) {
-    return (
-      <div className="
-        w-full mx-auto max-w-2xl bg-white space-y-6 md:space-y-8
-        p-4 mt-2
-        md:p-6 md:mt-10 md:w-2/3
-      ">
-        <p className="text-center text-xs md:text-sm text-gray-500">
-          Schritt 2 von 5
-        </p>
-
-        <CookieConsentNotice
-          onAccept={() => {
-            acceptLocalCookies();
-            setCookiesAccepted(true);
-          }}
-          title="Wir nutzen Cookies"
-          text="Für das volle Immobot-Erlebnis benötigen wir deine Zustimmung."
-          className="bg-blue-50"
-        />
-
-        <div className="flex justify-start">
-          <button
-            className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
-            onClick={() => navigate("/register/step1")}
-          >
-            &lt; Zurück
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const canProceed = Boolean(selectedCoordinate);
 
   // ------------------------------------------------------------
   // RENDER
@@ -257,10 +235,11 @@ export default function Step2() {
           value={query}
           disabled={!cookiesAccepted}
           onChange={(e) => {
-            setQuery(e.target.value);
+            const nextQuery = e.target.value;
+            setQuery(nextQuery);
             setHasUserTyped(true); // 🔑 erst jetzt Autocomplete
             setSelectedCoordinate(null);
-            setAddress("");
+            setAddress(nextQuery);
             setCoordinate(undefined);
           }}
           placeholder="z. B. Freiburg im Breisgau"
@@ -318,9 +297,16 @@ export default function Step2() {
         {cookiesAccepted ? (
           <div ref={mapRef} className="w-full h-full" />
         ) : (
-          <div className="flex h-full items-center justify-center bg-gray-100 px-4 text-center text-sm text-gray-500">
-            Karte erst nach Cookie-Zustimmung verfügbar.
-          </div>
+          <CookieConsentNotice
+            onAccept={() => {
+              acceptLocalCookies();
+              setCookiesAccepted(true);
+            }}
+            title="Karte erst nach Zustimmung laden"
+            text="Die Karte und automatische Ortssuche laden externe Dienste. Bitte stimme zu, um diesen Schritt fortzusetzen."
+            className="h-full rounded-none"
+            compact
+          />
         )}
       </div>
 
@@ -344,7 +330,7 @@ export default function Step2() {
 
         <button
           className={`px-8 py-3 rounded-xl font-medium ${
-            selectedCoordinate
+            canProceed
               ? "bg-blue-900 text-white hover:bg-blue-800 active:scale-95"
               : "bg-gray-300 text-gray-600 cursor-not-allowed"
           }`}
