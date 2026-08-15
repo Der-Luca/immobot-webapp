@@ -239,7 +239,7 @@ export default function RegisterFinish() {
             <span className="text-gray-700">
               Ich habe die{" "}
               <Link
-                to="/terms"
+                to="https://immobot.pro/nutzungsbedingungen"
                 className="underline text-blue-600"
                 target="_blank"
               >
@@ -247,7 +247,7 @@ export default function RegisterFinish() {
               </Link>{" "}
               und die{" "}
               <Link
-                to="/withdrawal"
+                to="https://immobot.pro/widerruf"
                 className="underline text-blue-600"
                 target="_blank"
               >
@@ -266,6 +266,20 @@ export default function RegisterFinish() {
             <p className="text-sm text-red-600 text-center">{err}</p>
           </div>
         )}
+
+        <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600">
+          Mit der Registrierung werden die von dir angegebenen Daten elektronisch erhoben
+          und gespeichert. Deine Daten werden nur zur Bearbeitung und Beantwortung deiner
+          Anfrage genutzt. Weitere Informationen findest du in unserem{" "}
+          <Link
+            to="https://immobot.pro/datenschutz"
+            className="font-semibold text-blue-600 underline"
+            target="_blank"
+          >
+            Datenschutzhinweis
+          </Link>
+          .
+        </p>
 
         <button
           type="submit"
