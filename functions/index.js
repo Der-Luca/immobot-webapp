@@ -450,6 +450,52 @@ async function checkCancelRequestRateLimit(email, ip) {
   });
 }
 
+async function checkWithdrawalRequestRateLimit(email, ip) {
+  const now = Date.now();
+  const minIntervalMs = 1000 * 15;
+  const windowMs = 1000 * 60 * 60;
+  const emailKey = hashValue(email);
+  const ipKey = hashValue(ip);
+  const emailRef = db.collection("contractWithdrawalRateLimits").doc(`email_${emailKey}`);
+  const ipRef = db.collection("contractWithdrawalRateLimits").doc(`ip_${ipKey}`);
+
+  await db.runTransaction(async (tx) => {
+    const [emailSnap, ipSnap] = await Promise.all([tx.get(emailRef), tx.get(ipRef)]);
+    const emailData = emailSnap.data() || {};
+    const ipData = ipSnap.data() || {};
+    const emailCount = emailData.windowStart && now - emailData.windowStart < windowMs
+      ? Number(emailData.count || 0)
+      : 0;
+    const ipCount = ipData.windowStart && now - ipData.windowStart < windowMs
+      ? Number(ipData.count || 0)
+      : 0;
+    const emailLastRequestAt = Number(emailData.lastRequestAt || 0);
+    const ipLastRequestAt = Number(ipData.lastRequestAt || 0);
+
+    if (
+      now - emailLastRequestAt < minIntervalMs ||
+      now - ipLastRequestAt < minIntervalMs ||
+      emailCount >= 3 ||
+      ipCount >= 30
+    ) {
+      throw new Error("RATE_LIMITED");
+    }
+
+    tx.set(emailRef, {
+      windowStart: emailCount ? emailData.windowStart : now,
+      count: emailCount + 1,
+      lastRequestAt: now,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    tx.set(ipRef, {
+      windowStart: ipCount ? ipData.windowStart : now,
+      count: ipCount + 1,
+      lastRequestAt: now,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+}
+
 async function sendSubscriptionCancelConfirmEmail(userRecord, token, confirmBaseUrl) {
   const confirmUrl = `${confirmBaseUrl}?token=${encodeURIComponent(token)}`;
   const transporter = getMailer();
@@ -657,6 +703,93 @@ async function sendExtraordinaryCancellationReviewEmail(userRecord, details = {}
   <p><strong>Grund:</strong></p>
   <p style="white-space:pre-wrap;">${escapeHtml(details.reason || "")}</p>
   <p>Diese Kündigung wurde nicht automatisch in Stripe beendet. Bitte manuell prüfen.</p>
+</body>
+</html>`,
+  });
+}
+
+async function sendContractWithdrawalReceiptEmail(toEmail, details = {}) {
+  const transporter = getMailer();
+
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: toEmail,
+    subject: "Dein Widerruf ist eingegangen",
+    html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Widerruf eingegangen</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F8FA;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F5F8FA;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+               style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td align="center" style="background-color:#0A3D62;color:#ffffff;padding:20px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;">Widerruf eingegangen</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 20px 0 20px;color:#555555;font-size:16px;">Hallo,</td>
+          </tr>
+          <tr>
+            <td style="padding:18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              dein Widerruf des online abgeschlossenen Vertrags über Immobot Pro ist elektronisch bei uns eingegangen.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Eingang des Widerrufs: ${escapeHtml(details.receivedAt || "")}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Inhalt der Widerrufserklärung: ${escapeHtml(details.declaration || "")}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 24px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              Wir prüfen die Wirksamkeit und Reichweite deines Widerrufs und melden uns elektronisch bei dir.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
+async function sendContractWithdrawalInternalEmail(details = {}) {
+  const transporter = getMailer();
+
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: "cd@immobot.pro",
+    subject: "Widerruf prüfen: Immobot Pro",
+    html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Widerruf prüfen</title>
+</head>
+<body style="font-family:Arial,sans-serif;color:#172033;">
+  <h1>Widerruf prüfen</h1>
+  <p><strong>Name:</strong> ${escapeHtml(details.name || "")}</p>
+  <p><strong>E-Mail:</strong> ${escapeHtml(details.email || "")}</p>
+  <p><strong>Vertrags-/Bestellnummer:</strong> ${escapeHtml(details.contractReference || "nicht angegeben")}</p>
+  <p><strong>Firebase UID:</strong> ${escapeHtml(details.uid || "nicht gefunden")}</p>
+  <p><strong>Stripe Subscription:</strong> ${escapeHtml(details.stripeSubscriptionId || "nicht gefunden")}</p>
+  <p><strong>Stripe Status:</strong> ${escapeHtml(details.stripeStatus || "nicht verfügbar")}</p>
+  <p><strong>Eingang:</strong> ${escapeHtml(details.receivedAt || "")}</p>
+  <p><strong>Firestore ID:</strong> ${escapeHtml(details.requestId || "")}</p>
+  <p><strong>Erklärung:</strong></p>
+  <p style="white-space:pre-wrap;">${escapeHtml(details.declaration || "")}</p>
+  <p>Es wurde keine automatische Kündigung, Rückzahlung oder Stripe-Aktion ausgeführt. Bitte manuell prüfen.</p>
 </body>
 </html>`,
   });
@@ -1603,6 +1736,171 @@ exports.confirmSubscriptionCancel = onRequest(
         "Kündigung fehlgeschlagen",
         `<h1>Kündigung fehlgeschlagen</h1><p>Die Kündigung konnte gerade nicht abgeschlossen werden. Bitte versuche es später erneut oder kontaktiere den Support.</p>`
       ));
+    }
+  }
+);
+
+// ============================================================================
+// REQUEST CONTRACT WITHDRAWAL
+// ============================================================================
+exports.requestContractWithdrawal = onCall(
+  {
+    region: "europe-west1",
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+  },
+  async (request) => {
+    const rawReq = request.rawRequest || {};
+    const enteredEmail = String(request.data?.email || "").trim().slice(0, 320);
+    const email = normalizeEmail(enteredEmail);
+    const name = String(request.data?.name || "").trim().slice(0, 180);
+    const contractReference = String(request.data?.contractReference || "").trim().slice(0, 180);
+    const declaration =
+      "Hiermit widerrufe ich den von mir online abgeschlossenen Vertrag über Immobot Pro.";
+    const receivedAtDate = new Date();
+    const receivedAt = receivedAtDate.toLocaleString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Europe/Berlin",
+    });
+    const ip = getClientIp(rawReq);
+    const userAgent = getRequestUserAgent(rawReq);
+    const origin = String(rawReq.headers?.origin || "").slice(0, 300);
+
+    if (!email || !email.includes("@")) {
+      throw new HttpsError("invalid-argument", "Bitte gib eine gültige E-Mail-Adresse ein.");
+    }
+
+    if (name.length < 2) {
+      throw new HttpsError("invalid-argument", "Bitte gib deinen Namen ein.");
+    }
+
+    try {
+      await checkWithdrawalRequestRateLimit(email, ip);
+    } catch (err) {
+      if (err.message === "RATE_LIMITED") {
+        throw new HttpsError("resource-exhausted", "Bitte versuche es später erneut.");
+      }
+      console.error("Withdrawal request rate limit error", err);
+      throw new HttpsError("internal", "Der Widerruf konnte gerade nicht übermittelt werden.");
+    }
+
+    try {
+      const userRecord = await admin.auth().getUserByEmail(email).catch(() => null);
+      let userData = {};
+      let stripeSubscriptionId = null;
+      let stripeStatus = null;
+      let stripeSubscriptionStatus = null;
+
+      if (userRecord) {
+        const userRef = db.collection("users").doc(userRecord.uid);
+        const userSnap = await userRef.get();
+        userData = userSnap.data() || {};
+        stripeSubscriptionId = userData.stripeSubscriptionId || null;
+        stripeStatus = userData.stripeStatus || null;
+        stripeSubscriptionStatus = userData.stripeSubscriptionStatus || null;
+
+        if (!stripeSubscriptionId && userData.stripeCustomerId) {
+          try {
+            const stripe = getStripe();
+            const subscription = await findLatestSubscription(stripe, userData.stripeCustomerId);
+            stripeSubscriptionId = subscription?.id || null;
+            stripeSubscriptionStatus = subscription?.status || stripeSubscriptionStatus;
+          } catch (stripeErr) {
+            console.error("Withdrawal Stripe lookup failed", stripeErr);
+          }
+        }
+      }
+
+      const requestRef = db.collection("contractWithdrawalRequests").doc();
+      await requestRef.set({
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "pending_review",
+        source: "public_webapp",
+        name,
+        enteredEmail,
+        normalizedEmail: email,
+        contractReference: contractReference || null,
+        declaration,
+        receivedAt,
+        receivedAtIso: receivedAtDate.toISOString(),
+        uid: userRecord?.uid || null,
+        authEmail: userRecord?.email || null,
+        stripeSubscriptionId: stripeSubscriptionId || null,
+        stripeStatus: stripeStatus || null,
+        stripeSubscriptionStatus: stripeSubscriptionStatus || null,
+        ip,
+        userAgent,
+        origin,
+        customerReceiptEmailSentAt: null,
+        internalReviewEmailSentAt: null,
+      });
+
+      try {
+        await sendContractWithdrawalReceiptEmail(email, {
+          receivedAt,
+          declaration,
+        });
+        await requestRef.set(
+          {
+            customerReceiptEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (mailErr) {
+        console.error("Withdrawal receipt mail could not be sent", mailErr);
+        await requestRef.set(
+          {
+            customerReceiptEmailError: mailErr?.message || "Mailversand fehlgeschlagen",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
+      try {
+        await sendContractWithdrawalInternalEmail({
+          requestId: requestRef.id,
+          name,
+          email,
+          contractReference,
+          uid: userRecord?.uid || null,
+          stripeSubscriptionId,
+          stripeStatus: stripeSubscriptionStatus || stripeStatus,
+          receivedAt,
+          declaration,
+        });
+        await requestRef.set(
+          {
+            internalReviewEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (mailErr) {
+        console.error("Withdrawal internal mail could not be sent", mailErr);
+        await requestRef.set(
+          {
+            internalReviewEmailError: mailErr?.message || "Interner Mailversand fehlgeschlagen",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
+      return {
+        ok: true,
+        message: "Dein Widerruf ist eingegangen. Du erhältst eine Bestätigung per E-Mail.",
+      };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("Withdrawal request error", err);
+      throw new HttpsError("internal", "Der Widerruf konnte gerade nicht übermittelt werden.");
     }
   }
 );

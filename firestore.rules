@@ -184,5 +184,10 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+
+    match /contractWithdrawalRequests/{id} {
+      allow read, update: if isAdmin();
+      allow create, delete: if false;
+    }
   }
 }

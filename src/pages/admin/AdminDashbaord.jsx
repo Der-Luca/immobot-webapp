@@ -63,6 +63,15 @@ export default function AdminDashboard() {
             color="text-amber-700"
             bg="bg-amber-50"
           />
+
+          <NavCard
+            title="Widerrufe"
+            desc="Online-Widerrufe prüfen und intern dokumentieren."
+            to="/admin/withdrawals"
+            icon={<WithdrawalIcon />}
+            color="text-sky-700"
+            bg="bg-sky-50"
+          />
           
         </div>
       </div>
@@ -134,6 +143,14 @@ function CleanupIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m3-3h4a1 1 0 011 1v2H9V5a1 1 0 011-1z" />
+    </svg>
+  );
+}
+
+function WithdrawalIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l-4-4m0 0l4-4m-4 4h11a4 4 0 010 8h-1" />
     </svg>
   );
 }

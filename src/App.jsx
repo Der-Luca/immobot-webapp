@@ -10,7 +10,9 @@ import AdminOffers from "./pages/admin/offers/AdminOffers";
 import AdminOfferDetails from "./pages/admin/offers/AdminOfferDetails";
 import AdminCleanup from "./pages/admin/cleanup/AdminCleanup";
 import AdminCancellations from "./pages/admin/cancellations/AdminCancellations";
+import AdminWithdrawals from "./pages/admin/withdrawals/AdminWithdrawals";
 import CookieConsentManager from "./components/CookieConsentManager";
+import ContractWithdrawal from "./pages/public/ContractWithdrawal";
 
 // Register-Flow (öffentlich)
 import Step1 from "./pages/public/register/Step1";
@@ -55,6 +57,8 @@ export default function App() {
             </PublicOnlyRoute>
           }
         />
+
+        <Route path="/widerruf" element={<ContractWithdrawal />} />
 
         {/* Register-Flow */}
        <Route
@@ -107,6 +111,7 @@ export default function App() {
 	<Route path="/admin/offers/:offerId" element={<AdminOfferDetails />} />
 	<Route path="/admin/cleanup" element={<AdminCleanup />} />
 	<Route path="/admin/cancellations" element={<AdminCancellations />} />
+	<Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
 
 
       </Route>
