@@ -17,8 +17,6 @@ export default function RegisterFinish() {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
 
-  const [acceptLegalConsent, setAcceptLegalConsent] = useState(false);
-
   const [showPw, setShowPw] = useState(false);
   const [showPw2, setShowPw2] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,7 +24,6 @@ export default function RegisterFinish() {
 
   const canSubmit =
     !busy &&
-    acceptLegalConsent &&
     firstName.trim() &&
     lastName.trim() &&
     email.trim() &&
@@ -74,11 +71,6 @@ export default function RegisterFinish() {
         // Custom Double Opt-In
         customEmailVerified: false,
         allowMail: true,
-        acceptedTermsAt: serverTimestamp(),
-        acceptedWithdrawalNoticeAt: serverTimestamp(),
-        acceptedImmediateDigitalContentStartAt: serverTimestamp(),
-        acceptedDigitalContentWithdrawalLossAt: serverTimestamp(),
-        legalConsentVersion: "register-finish-fagg-v1",
         createdAt: serverTimestamp(),
       };
 
@@ -224,41 +216,6 @@ export default function RegisterFinish() {
               </svg>
             )}
           </button>
-        </div>
-
-        {/* Checkboxes */}
-        <div className="space-y-3 pt-2">
-          <label className="flex items-start gap-3 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              checked={acceptLegalConsent}
-              onChange={(e) => setAcceptLegalConsent(e.target.checked)}
-              required
-            />
-            <span className="text-gray-700">
-              Ich habe die{" "}
-              <Link
-                to="https://immobot.pro/nutzungsbedingungen"
-                className="underline text-blue-600"
-                target="_blank"
-              >
-                AGB
-              </Link>{" "}
-              und die{" "}
-              <Link
-                to="https://immobot.pro/widerruf"
-                className="underline text-blue-600"
-                target="_blank"
-              >
-                Rücktrittsbelehrung
-              </Link>
-              {" "}gelesen und akzeptiere diese. Ich stimme ausdrücklich zu,
-              dass mit der Bereitstellung der digitalen Inhalte sofort begonnen
-              wird und ich dadurch mein Rücktrittsrecht gem. § 18 Abs. 1 Z 11
-              FAGG verliere.
-            </span>
-          </label>
         </div>
 
         {err && (

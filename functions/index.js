@@ -45,6 +45,14 @@ const PRICE_MONTHLY = defineString("PRICE_MONTHLY");
 const PRICE_YEARLY = defineString("PRICE_YEARLY");
 const FRONTEND_BASE_URL = defineString("FRONTEND_BASE_URL");
 
+const CHECKOUT_CONSENT_VERSION = "stripe-checkout-consent-v1";
+const EARLY_SERVICE_START_FIELD_KEY = "early_service_start";
+const EARLY_SERVICE_START_FIELD_LABEL = "Vorzeitiger Beginn der Dienstleistung";
+const EARLY_SERVICE_START_ACCEPTED_VALUE = "accepted";
+const EARLY_SERVICE_START_ACCEPTED_LABEL = "Ja, ich stimme ausdrücklich zu";
+const EARLY_SERVICE_START_NOTICE =
+  "In Kenntnis des Hinweises zum Widerrufsrecht stimme ich ausdrücklich zu, dass die Ausführung der Dienstleistung vor dem Ende der Widerrufsfrist beginnt.";
+
 const OFFER_REDIRECT_RETENTION_DAYS = 31;
 const OFFER_REDIRECT_DELETE_BATCH_SIZE = 450;
 const OFFER_REDIRECT_MAX_DELETES_PER_RUN = 10000;
@@ -1127,7 +1135,37 @@ exports.createCheckoutSession = onCall(
       customer: customerId,
       line_items: [{ price: data.priceId, quantity: 1 }],
       allow_promotion_codes: true,
-      metadata: { firebaseUid: uid },
+      consent_collection: {
+        terms_of_service: "required",
+      },
+      custom_fields: [
+        {
+          key: EARLY_SERVICE_START_FIELD_KEY,
+          label: {
+            type: "custom",
+            custom: EARLY_SERVICE_START_FIELD_LABEL,
+          },
+          type: "dropdown",
+          dropdown: {
+            options: [
+              {
+                label: EARLY_SERVICE_START_ACCEPTED_LABEL,
+                value: EARLY_SERVICE_START_ACCEPTED_VALUE,
+              },
+            ],
+          },
+          optional: false,
+        },
+      ],
+      custom_text: {
+        submit: {
+          message: EARLY_SERVICE_START_NOTICE,
+        },
+      },
+      metadata: {
+        firebaseUid: uid,
+        checkoutConsentVersion: CHECKOUT_CONSENT_VERSION,
+      },
       subscription_data: { metadata: { firebaseUid: uid } },
       success_url: `${FRONTEND_BASE_URL.value()}/dashboard?checkout=success`,
       cancel_url: `${FRONTEND_BASE_URL.value()}/dashboard?checkout=cancel`,
@@ -2056,14 +2094,66 @@ exports.handleStripeWebhook = onRequest(
         case "checkout.session.completed": {
           const uid = obj.metadata?.firebaseUid;
           if (uid) {
-            await db.collection("users").doc(uid).set(
-              {
-                stripeStatus: "pending",
-                stripeCustomerId: obj.customer,
-                stripeSubscriptionId: obj.subscription,
-              },
-              { merge: true }
-            );
+            const userRef = db.collection("users").doc(uid);
+            const consentVersion = obj.metadata?.checkoutConsentVersion || null;
+            const termsOfServiceStatus = obj.consent?.terms_of_service || null;
+            const earlyServiceStartField = Array.isArray(obj.custom_fields)
+              ? obj.custom_fields.find(
+                (field) => field?.key === EARLY_SERVICE_START_FIELD_KEY
+              )
+              : null;
+            const earlyServiceStartValue =
+              earlyServiceStartField?.dropdown?.value || null;
+            const completedAt = Number.isFinite(event.created)
+              ? admin.firestore.Timestamp.fromMillis(event.created * 1000)
+              : admin.firestore.FieldValue.serverTimestamp();
+
+            const userUpdate = {
+              stripeStatus: "pending",
+              stripeCustomerId: obj.customer,
+              stripeSubscriptionId: obj.subscription,
+            };
+            const batch = db.batch();
+
+            if (consentVersion === CHECKOUT_CONSENT_VERSION) {
+              const consentSummary = {
+                stripeSessionId: obj.id,
+                completedAt,
+                termsOfServiceStatus,
+                earlyServiceStartValue,
+                textVersion: CHECKOUT_CONSENT_VERSION,
+              };
+              const consentRecord = {
+                ...consentSummary,
+                stripeEventId: event.id,
+                termsOfServiceTextSource: "stripe_dashboard_public_details",
+                earlyServiceStartFieldLabel: EARLY_SERVICE_START_FIELD_LABEL,
+                earlyServiceStartAcceptedLabel: EARLY_SERVICE_START_ACCEPTED_LABEL,
+                earlyServiceStartNotice: EARLY_SERVICE_START_NOTICE,
+                requirementsSatisfied:
+                  termsOfServiceStatus === "accepted" &&
+                  earlyServiceStartValue === EARLY_SERVICE_START_ACCEPTED_VALUE,
+              };
+
+              userUpdate.stripeCheckoutConsent = consentSummary;
+              batch.set(
+                userRef.collection("stripeCheckoutConsents").doc(obj.id),
+                consentRecord,
+                { merge: true }
+              );
+
+              if (!consentRecord.requirementsSatisfied) {
+                console.warn("Checkout completed without expected consent values", {
+                  sessionId: obj.id,
+                  uid,
+                  termsOfServiceStatus,
+                  earlyServiceStartValue,
+                });
+              }
+            }
+
+            batch.set(userRef, userUpdate, { merge: true });
+            await batch.commit();
           }
           break;
         }
