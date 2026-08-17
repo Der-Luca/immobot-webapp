@@ -45,7 +45,9 @@ const PRICE_MONTHLY = defineString("PRICE_MONTHLY");
 const PRICE_YEARLY = defineString("PRICE_YEARLY");
 const FRONTEND_BASE_URL = defineString("FRONTEND_BASE_URL");
 
-const CHECKOUT_CONSENT_VERSION = "stripe-checkout-consent-v1";
+const CHECKOUT_CONSENT_VERSION = "stripe-checkout-consent-v2";
+const TERMS_OF_SERVICE_ACCEPTANCE_TEXT =
+  "Ich akzeptiere die Allgemeinen Geschäftsbedingungen und bestätige, die Widerrufsbelehrung zur Kenntnis genommen zu haben.";
 const EARLY_SERVICE_START_FIELD_KEY = "early_service_start";
 const EARLY_SERVICE_START_FIELD_LABEL = "Vorzeitiger Beginn der Dienstleistung";
 const EARLY_SERVICE_START_ACCEPTED_VALUE = "accepted";
@@ -1158,6 +1160,9 @@ exports.createCheckoutSession = onCall(
         },
       ],
       custom_text: {
+        terms_of_service_acceptance: {
+          message: TERMS_OF_SERVICE_ACCEPTANCE_TEXT,
+        },
         submit: {
           message: EARLY_SERVICE_START_NOTICE,
         },
@@ -2126,7 +2131,9 @@ exports.handleStripeWebhook = onRequest(
               const consentRecord = {
                 ...consentSummary,
                 stripeEventId: event.id,
-                termsOfServiceTextSource: "stripe_dashboard_public_details",
+                termsOfServiceAcceptanceText: TERMS_OF_SERVICE_ACCEPTANCE_TEXT,
+                termsOfServiceTextSource:
+                  "custom_text_and_stripe_dashboard_public_details",
                 earlyServiceStartFieldLabel: EARLY_SERVICE_START_FIELD_LABEL,
                 earlyServiceStartAcceptedLabel: EARLY_SERVICE_START_ACCEPTED_LABEL,
                 earlyServiceStartNotice: EARLY_SERVICE_START_NOTICE,
