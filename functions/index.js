@@ -45,15 +45,16 @@ const PRICE_MONTHLY = defineString("PRICE_MONTHLY");
 const PRICE_YEARLY = defineString("PRICE_YEARLY");
 const FRONTEND_BASE_URL = defineString("FRONTEND_BASE_URL");
 
-const CHECKOUT_CONSENT_VERSION = "stripe-checkout-consent-v2";
+const CHECKOUT_CONSENT_VERSION = "stripe-checkout-consent-v3";
+const SUPPORTED_CHECKOUT_CONSENT_VERSIONS = new Set([
+  "stripe-checkout-consent-v1",
+  "stripe-checkout-consent-v2",
+  CHECKOUT_CONSENT_VERSION,
+]);
+const LEGACY_EARLY_SERVICE_START_FIELD_KEY = "early_service_start";
+const LEGACY_EARLY_SERVICE_START_ACCEPTED_VALUE = "accepted";
 const TERMS_OF_SERVICE_ACCEPTANCE_TEXT =
-  "Ich akzeptiere die Allgemeinen Geschäftsbedingungen und bestätige, die Widerrufsbelehrung zur Kenntnis genommen zu haben.";
-const EARLY_SERVICE_START_FIELD_KEY = "early_service_start";
-const EARLY_SERVICE_START_FIELD_LABEL = "Vorzeitiger Beginn der Dienstleistung";
-const EARLY_SERVICE_START_ACCEPTED_VALUE = "accepted";
-const EARLY_SERVICE_START_ACCEPTED_LABEL = "Ja, ich stimme ausdrücklich zu";
-const EARLY_SERVICE_START_NOTICE =
-  "In Kenntnis des Hinweises zum Widerrufsrecht stimme ich ausdrücklich zu, dass die Ausführung der Dienstleistung vor dem Ende der Widerrufsfrist beginnt.";
+  "Ich akzeptiere die Allgemeinen Geschäftsbedingungen und bestätige, die Datenschutzerklärung sowie die Widerrufsbelehrung zur Kenntnis genommen zu haben. Ich verlange ausdrücklich, dass mit der Ausführung der Dienstleistung vor Ablauf der Widerrufsfrist begonnen wird. Mir ist bekannt, dass mein Widerrufsrecht bei vollständiger Vertragserfüllung erlischt.";
 
 const OFFER_REDIRECT_RETENTION_DAYS = 31;
 const OFFER_REDIRECT_DELETE_BATCH_SIZE = 450;
@@ -1140,31 +1141,9 @@ exports.createCheckoutSession = onCall(
       consent_collection: {
         terms_of_service: "required",
       },
-      custom_fields: [
-        {
-          key: EARLY_SERVICE_START_FIELD_KEY,
-          label: {
-            type: "custom",
-            custom: EARLY_SERVICE_START_FIELD_LABEL,
-          },
-          type: "dropdown",
-          dropdown: {
-            options: [
-              {
-                label: EARLY_SERVICE_START_ACCEPTED_LABEL,
-                value: EARLY_SERVICE_START_ACCEPTED_VALUE,
-              },
-            ],
-          },
-          optional: false,
-        },
-      ],
       custom_text: {
         terms_of_service_acceptance: {
           message: TERMS_OF_SERVICE_ACCEPTANCE_TEXT,
-        },
-        submit: {
-          message: EARLY_SERVICE_START_NOTICE,
         },
       },
       metadata: {
@@ -2102,13 +2081,13 @@ exports.handleStripeWebhook = onRequest(
             const userRef = db.collection("users").doc(uid);
             const consentVersion = obj.metadata?.checkoutConsentVersion || null;
             const termsOfServiceStatus = obj.consent?.terms_of_service || null;
-            const earlyServiceStartField = Array.isArray(obj.custom_fields)
+            const legacyEarlyServiceStartField = Array.isArray(obj.custom_fields)
               ? obj.custom_fields.find(
-                (field) => field?.key === EARLY_SERVICE_START_FIELD_KEY
+                (field) => field?.key === LEGACY_EARLY_SERVICE_START_FIELD_KEY
               )
               : null;
-            const earlyServiceStartValue =
-              earlyServiceStartField?.dropdown?.value || null;
+            const legacyEarlyServiceStartValue =
+              legacyEarlyServiceStartField?.dropdown?.value || null;
             const completedAt = Number.isFinite(event.created)
               ? admin.firestore.Timestamp.fromMillis(event.created * 1000)
               : admin.firestore.FieldValue.serverTimestamp();
@@ -2120,26 +2099,36 @@ exports.handleStripeWebhook = onRequest(
             };
             const batch = db.batch();
 
-            if (consentVersion === CHECKOUT_CONSENT_VERSION) {
+            if (SUPPORTED_CHECKOUT_CONSENT_VERSIONS.has(consentVersion)) {
+              const isCombinedCheckboxConsent =
+                consentVersion === CHECKOUT_CONSENT_VERSION;
               const consentSummary = {
                 stripeSessionId: obj.id,
                 completedAt,
                 termsOfServiceStatus,
-                earlyServiceStartValue,
-                textVersion: CHECKOUT_CONSENT_VERSION,
+                earlyServiceStartValue: legacyEarlyServiceStartValue,
+                textVersion: consentVersion,
               };
               const consentRecord = {
                 ...consentSummary,
                 stripeEventId: event.id,
-                termsOfServiceAcceptanceText: TERMS_OF_SERVICE_ACCEPTANCE_TEXT,
+                termsOfServiceAcceptanceText:
+                  obj.custom_text?.terms_of_service_acceptance?.message ||
+                  (isCombinedCheckboxConsent
+                    ? TERMS_OF_SERVICE_ACCEPTANCE_TEXT
+                    : null),
                 termsOfServiceTextSource:
-                  "custom_text_and_stripe_dashboard_public_details",
-                earlyServiceStartFieldLabel: EARLY_SERVICE_START_FIELD_LABEL,
-                earlyServiceStartAcceptedLabel: EARLY_SERVICE_START_ACCEPTED_LABEL,
-                earlyServiceStartNotice: EARLY_SERVICE_START_NOTICE,
+                  obj.custom_text?.terms_of_service_acceptance?.message ||
+                  isCombinedCheckboxConsent
+                    ? "custom_text_and_stripe_dashboard_public_details"
+                    : "stripe_dashboard_public_details",
+                earlyServiceStartNotice:
+                  obj.custom_text?.submit?.message || null,
                 requirementsSatisfied:
                   termsOfServiceStatus === "accepted" &&
-                  earlyServiceStartValue === EARLY_SERVICE_START_ACCEPTED_VALUE,
+                  (isCombinedCheckboxConsent ||
+                    legacyEarlyServiceStartValue ===
+                      LEGACY_EARLY_SERVICE_START_ACCEPTED_VALUE),
               };
 
               userUpdate.stripeCheckoutConsent = consentSummary;
@@ -2154,7 +2143,7 @@ exports.handleStripeWebhook = onRequest(
                   sessionId: obj.id,
                   uid,
                   termsOfServiceStatus,
-                  earlyServiceStartValue,
+                  legacyEarlyServiceStartValue,
                 });
               }
             }
