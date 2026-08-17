@@ -247,8 +247,8 @@ export default function RegisterFinish() {
         </button>
 
         <p className="text-xs text-gray-500 mt-2 text-center px-2">
-          Keine Sorge: Du kannst dein Abo im nächsten Schritt wählen und
-          später jederzeit kündigen.
+          Auf der nächsten Seite finden Sie alle Vertragsdaten und können den
+          Vertrag schließen.
         </p>
       </form>
 
