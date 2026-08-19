@@ -45,7 +45,7 @@ const PRICE_MONTHLY = defineString("PRICE_MONTHLY");
 const PRICE_YEARLY = defineString("PRICE_YEARLY");
 const FRONTEND_BASE_URL = defineString("FRONTEND_BASE_URL");
 
-const CHECKOUT_CONSENT_VERSION = "stripe-checkout-consent-v3";
+const CHECKOUT_CONSENT_VERSION = "stripe-checkout-consent-v4";
 const SUPPORTED_CHECKOUT_CONSENT_VERSIONS = new Set([
   "stripe-checkout-consent-v1",
   "stripe-checkout-consent-v2",
@@ -54,7 +54,9 @@ const SUPPORTED_CHECKOUT_CONSENT_VERSIONS = new Set([
 const LEGACY_EARLY_SERVICE_START_FIELD_KEY = "early_service_start";
 const LEGACY_EARLY_SERVICE_START_ACCEPTED_VALUE = "accepted";
 const TERMS_OF_SERVICE_ACCEPTANCE_TEXT =
-  "Ich akzeptiere die Allgemeinen Geschäftsbedingungen und bestätige, die Datenschutzerklärung sowie die Widerrufsbelehrung zur Kenntnis genommen zu haben. Ich verlange ausdrücklich, dass mit der Ausführung der Dienstleistung vor Ablauf der Widerrufsfrist begonnen wird. Mir ist bekannt, dass mein Widerrufsrecht bei vollständiger Vertragserfüllung erlischt.";
+  "Ich akzeptiere die Allgemeinen Geschäftsbedingungen (https://immobot.pro/nutzungsbedingungen/) und bestätige, die Datenschutzerklärung (https://immobot.pro/datenschutz/) sowie die Widerrufsbelehrung (https://immobot.pro/widerruf/) zur Kenntnis genommen zu haben.\n\n" +
+  "Das Widerrufsrecht erlischt bei einem Vertrag zur Erbringung von Dienstleistungen, wenn die Dienstleistung vollständig erbracht wurde und mit der Ausführung der Dienstleistung erst begonnen wurde, nachdem der Verbraucher dazu seine ausdrückliche Zustimmung gegeben hat und gleichzeitig seine Kenntnis davon bestätigt hat, dass er sein Widerrufsrecht bei vollständiger Vertragserfüllung durch den Unternehmer verliert.\n\n" +
+  "In Kenntnis dieses Hinweises stimme ich ausdrücklich zu, dass die Ausführung der Dienstleistung(en) vor dem Ende der Widerrufsfrist beginnt.";
 
 const OFFER_REDIRECT_RETENTION_DAYS = 31;
 const OFFER_REDIRECT_DELETE_BATCH_SIZE = 450;
