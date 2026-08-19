@@ -1,5 +1,7 @@
 // src/components/payment/PaymentOverlay.jsx
 
+import CheckoutLegalLinks from "./CheckoutLegalLinks";
+
 export default function PaymentOverlay({
   loading,
   error,
@@ -17,6 +19,8 @@ export default function PaymentOverlay({
           Aktiviere Immobot&nbsp;Pro und starte direkt mit deiner automatischen
           Immobiliensuche.
         </p>
+
+        <CheckoutLegalLinks />
 
         {/* MONATLICH */}
         <button

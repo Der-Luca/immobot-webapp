@@ -1,3 +1,5 @@
+import CheckoutLegalLinks from "./CheckoutLegalLinks";
+
 export default function ReactivateOverlay({ onReactivate, loading }) {
   return (
     <div className="fixed inset-0 bg-white/80 backdrop-blur-md flex items-center justify-center z-50 px-4">
@@ -10,6 +12,8 @@ export default function ReactivateOverlay({ onReactivate, loading }) {
           Dein Immobot Pro-Abo wurde beendet.
           Du kannst es jederzeit wieder aktivieren.
         </p>
+
+        <CheckoutLegalLinks />
 
         <button
           onClick={onReactivate}
