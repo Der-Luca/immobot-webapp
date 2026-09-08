@@ -509,6 +509,52 @@ async function checkWithdrawalRequestRateLimit(email, ip) {
   });
 }
 
+async function checkPasswordResetRateLimit(email, ip) {
+  const now = Date.now();
+  const minIntervalMs = 1000 * 15;
+  const windowMs = 1000 * 60 * 60;
+  const emailKey = hashValue(email);
+  const ipKey = hashValue(ip);
+  const emailRef = db.collection("passwordResetRateLimits").doc(`email_${emailKey}`);
+  const ipRef = db.collection("passwordResetRateLimits").doc(`ip_${ipKey}`);
+
+  await db.runTransaction(async (tx) => {
+    const [emailSnap, ipSnap] = await Promise.all([tx.get(emailRef), tx.get(ipRef)]);
+    const emailData = emailSnap.data() || {};
+    const ipData = ipSnap.data() || {};
+    const emailCount = emailData.windowStart && now - emailData.windowStart < windowMs
+      ? Number(emailData.count || 0)
+      : 0;
+    const ipCount = ipData.windowStart && now - ipData.windowStart < windowMs
+      ? Number(ipData.count || 0)
+      : 0;
+    const emailLastRequestAt = Number(emailData.lastRequestAt || 0);
+    const ipLastRequestAt = Number(ipData.lastRequestAt || 0);
+
+    if (
+      now - emailLastRequestAt < minIntervalMs ||
+      now - ipLastRequestAt < minIntervalMs ||
+      emailCount >= 3 ||
+      ipCount >= 30
+    ) {
+      throw new Error("RATE_LIMITED");
+    }
+
+    tx.set(emailRef, {
+      windowStart: emailCount ? emailData.windowStart : now,
+      count: emailCount + 1,
+      lastRequestAt: now,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    tx.set(ipRef, {
+      windowStart: ipCount ? ipData.windowStart : now,
+      count: ipCount + 1,
+      lastRequestAt: now,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+}
+
 async function sendSubscriptionCancelConfirmEmail(userRecord, token, confirmBaseUrl) {
   const confirmUrl = `${confirmBaseUrl}?token=${encodeURIComponent(token)}`;
   const transporter = getMailer();
@@ -2055,6 +2101,79 @@ async function sendVerifyEmailForUid(uid) {
   return { ok: true };
 }
 
+async function sendPasswordResetMail(userRecord) {
+  const resetUrl = await admin.auth().generatePasswordResetLink(userRecord.email);
+  const safeResetUrl = escapeHtml(resetUrl);
+  const transporter = getMailer();
+
+  await transporter.sendMail({
+    from: `"Immobot" <${SMTP_USER.value()}>`,
+    to: userRecord.email,
+    subject: "Dein Immobot-Passwort zurücksetzen",
+    text: [
+      "Hallo,",
+      "",
+      "wir haben eine Anfrage erhalten, das Passwort für dein Immobot-Konto zurückzusetzen.",
+      "Öffne dazu diesen Link:",
+      resetUrl,
+      "",
+      "Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.",
+    ].join("\n"),
+    html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Passwort zurücksetzen</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F8FA;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F5F8FA;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+               style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td align="center" style="background-color:#0A3D62;color:#ffffff;padding:20px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;">Passwort zurücksetzen</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 20px 0 20px;color:#555555;font-size:16px;">Hallo,</td>
+          </tr>
+          <tr>
+            <td style="padding:18px 20px;color:#555555;font-size:16px;line-height:1.5;">
+              wir haben eine Anfrage erhalten, das Passwort für dein Immobot-Konto zurückzusetzen.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 20px 24px 20px;">
+              <table cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="border-radius:6px;" bgcolor="#0A3D62">
+                    <a href="${safeResetUrl}" target="_blank"
+                       style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;border-radius:6px;">
+                      Neues Passwort vergeben
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 20px 24px 20px;color:#6b7280;font-size:13px;line-height:1.5;">
+              <hr style="border:0;border-top:1px solid #E5E7EB;margin:10px 0 16px 0;" />
+              <div style="margin:0 0 12px 0;">Falls du diese Anfrage nicht gestellt hast, ignoriere diese E-Mail.</div>
+              <div>Falls der Button nicht funktioniert: <a href="${safeResetUrl}" target="_blank" style="color:#0A3D62;text-decoration:underline;">Reset-Link öffnen</a></div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
 exports.handleStripeWebhook = onRequest(
   { region: "europe-west1", secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS] },
   async (req, res) => {
@@ -2275,6 +2394,74 @@ exports.sendVerifyEmail = onCall(
   async ({ auth }) => {
     if (!auth) throw new Error("Nicht eingeloggt");
     return sendVerifyEmailForUid(auth.uid);
+  }
+);
+
+exports.requestPasswordReset = onCall(
+  {
+    region: "europe-west1",
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+  },
+  async (request) => {
+    const genericResponse = {
+      ok: true,
+      message: "Falls ein Konto mit dieser E-Mail-Adresse existiert, wurde ein Reset-Link versendet.",
+    };
+    const requestedEmail = normalizeEmail(request.data?.email).slice(0, 320);
+    const ip = getClientIp(request.rawRequest || {});
+    let userRecord = null;
+
+    const enforceRateLimit = async (email) => {
+      try {
+        await checkPasswordResetRateLimit(email, ip);
+      } catch (err) {
+        if (err?.message === "RATE_LIMITED") {
+          throw new HttpsError(
+            "resource-exhausted",
+            "Bitte warte kurz, bevor du einen weiteren Reset-Link anforderst."
+          );
+        }
+        console.error("Password reset rate limit failed", err);
+        throw new HttpsError("unavailable", "Der Reset-Link konnte gerade nicht versendet werden.");
+      }
+    };
+
+    if (!request.auth?.uid) {
+      if (!requestedEmail || !requestedEmail.includes("@")) {
+        return genericResponse;
+      }
+      await enforceRateLimit(requestedEmail);
+    }
+
+    try {
+      userRecord = request.auth?.uid
+        ? await admin.auth().getUser(request.auth.uid)
+        : await admin.auth().getUserByEmail(requestedEmail);
+    } catch (err) {
+      if (err?.code === "auth/user-not-found" || err?.code === "auth/invalid-email") {
+        return genericResponse;
+      }
+      console.error("Password reset user lookup failed", err);
+      throw new HttpsError("unavailable", "Der Reset-Link konnte gerade nicht versendet werden.");
+    }
+
+    const email = normalizeEmail(userRecord.email);
+    if (!email) return genericResponse;
+
+    if (request.auth?.uid) await enforceRateLimit(email);
+
+    try {
+      await sendPasswordResetMail(userRecord);
+      console.log("Password reset mail sent", { uid: userRecord.uid });
+      return genericResponse;
+    } catch (err) {
+      console.error("Password reset mail could not be sent", {
+        uid: userRecord.uid,
+        code: err?.code || null,
+        message: err?.message || "Unknown error",
+      });
+      throw new HttpsError("unavailable", "Der Reset-Link konnte gerade nicht versendet werden.");
+    }
   }
 );
 

@@ -1,7 +1,8 @@
 // src/pages/public/Login.jsx
 import { useState } from "react";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "../../firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import { auth, functions } from "../../firebase";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
@@ -56,14 +57,21 @@ export default function Login() {
 
     setResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, mail);
-      setResetMsg("Reset-Link wurde versendet. Bitte prüfe dein Postfach.");
+      const requestPasswordReset = httpsCallable(functions, "requestPasswordReset");
+      const result = await requestPasswordReset({ email: mail });
+      setResetMsg(
+        result.data?.message ||
+          "Falls ein Konto mit dieser E-Mail-Adresse existiert, wurde ein Reset-Link versendet."
+      );
       // optional: nach kurzer Zeit schließen
       // setTimeout(() => setResetOpen(false), 1200);
     } catch (err) {
       console.error(err);
-      // bewusst generisch, damit keine Account-Enumeration möglich ist
-      setResetMsg("Wenn die E-Mail existiert, bekommst du gleich einen Reset-Link.");
+      if (err?.code === "functions/resource-exhausted") {
+        setResetMsg("Bitte warte kurz, bevor du einen weiteren Reset-Link anforderst.");
+      } else {
+        setResetMsg("Der Reset-Link konnte gerade nicht versendet werden. Bitte versuche es später erneut.");
+      }
     } finally {
       setResetLoading(false);
     }

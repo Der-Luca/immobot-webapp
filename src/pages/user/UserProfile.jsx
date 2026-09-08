@@ -6,7 +6,6 @@ import { db } from "@/firebase.js";
 import {
   getAuth,
   updateEmail as fbUpdateEmail,
-  sendPasswordResetEmail,
 } from "firebase/auth";
 
 import { httpsCallable } from "firebase/functions";
@@ -35,6 +34,7 @@ export default function UserProfile() {
 
   const [emailDraft, setEmailDraft] = useState("");
   const [updatingEmail, setUpdatingEmail] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   // Billing
   const [billingLoading, setBillingLoading] = useState(false);
@@ -185,8 +185,23 @@ export default function UserProfile() {
   }
 
   async function resetPassword() {
-    await sendPasswordResetEmail(auth, user.email);
-    setNotice("Passwort-Reset-Link wurde per E-Mail versendet.");
+    setResettingPassword(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const fn = httpsCallable(functions, "requestPasswordReset");
+      const result = await fn();
+      setNotice(result.data?.message || "Passwort-Reset-Link wurde per E-Mail versendet.");
+    } catch (err) {
+      if (err?.code === "functions/resource-exhausted") {
+        setError("Bitte warte kurz, bevor du einen weiteren Reset-Link anforderst.");
+      } else {
+        setError("Der Passwort-Reset-Link konnte gerade nicht versendet werden.");
+      }
+    } finally {
+      setResettingPassword(false);
+    }
   }
 
   async function openBillingPortal() {
@@ -364,9 +379,10 @@ export default function UserProfile() {
 
                           <button
                             onClick={resetPassword}
+                            disabled={resettingPassword}
                             className="px-4 py-2 rounded-xl border border-gray-200 text-sm"
                           >
-                            Passwort zurücksetzen
+                            {resettingPassword ? "Wird gesendet…" : "Passwort zurücksetzen"}
                           </button>
                         </div>
 

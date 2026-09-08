@@ -24,6 +24,6 @@ export const db = getFirestore(app);
 // Cloud Functions Client
 // Region anpassen, falls du deine Functions z.B. in europe-west1 deployst:
 // export const functions = getFunctions(app, "europe-west1");
-export const functions = getFunctions(undefined, "europe-west1");
+export const functions = getFunctions(app, "europe-west1");
 
 export default app;
